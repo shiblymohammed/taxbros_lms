@@ -1,0 +1,105 @@
+### Test Progress Retrieval Endpoints (Task 35)
+### These endpoints allow retrieving lesson progress data
+
+@baseUrl = http://localhost:3000/api
+@token = Bearer YOUR_JWT_TOKEN_HERE
+@lessonId = LESSON_UUID_HERE
+@courseId = COURSE_UUID_HERE
+@studentId = STUDENT_UUID_HERE
+
+### 1. Get single lesson progress for current user
+### GET /lessons/:lessonId/progress
+### Returns progress status, position, watched duration, completion status
+GET {{baseUrl}}/lessons/{{lessonId}}/progress
+Authorization: {{token}}
+
+###
+
+### 2. Get all lesson progress in a course for current user
+### GET /courses/:courseId/progress
+### Returns all lessons with progress status, ordered by display order
+GET {{baseUrl}}/courses/{{courseId}}/progress
+Authorization: {{token}}
+
+###
+
+### 3. Get all progress for a specific student
+### GET /students/:studentId/progress
+### Returns all course enrollments with lesson progress
+### Students can only view their own; admins can view any student
+GET {{baseUrl}}/students/{{studentId}}/progress
+Authorization: {{token}}
+
+###
+
+### Expected Response Structures:
+
+### 1. GET /lessons/:lessonId/progress
+# {
+#   "id": "uuid",
+#   "studentId": "uuid",
+#   "lessonId": "uuid",
+#   "status": "NOT_STARTED | IN_PROGRESS | COMPLETED",
+#   "lastPosition": 0,
+#   "watchedDuration": 0,
+#   "completedAt": null,
+#   "lesson": {
+#     "id": "uuid",
+#     "title": "Lesson Title",
+#     "duration": 600,
+#     "course": {
+#       "id": "uuid",
+#       "title": "Course Title"
+#     }
+#   }
+# }
+
+### 2. GET /courses/:courseId/progress
+# {
+#   "courseId": "uuid",
+#   "courseTitle": "Course Title",
+#   "enrollmentStatus": "ACTIVE",
+#   "progressPercentage": 33,
+#   "lessons": [
+#     {
+#       "lessonId": "uuid",
+#       "lessonTitle": "Lesson 1",
+#       "moduleTitle": "Module 1",
+#       "displayOrder": 1,
+#       "duration": 600,
+#       "status": "COMPLETED",
+#       "lastPosition": 600,
+#       "watchedDuration": 612,
+#       "completedAt": "2024-01-15T10:30:00Z"
+#     }
+#   ]
+# }
+
+### 3. GET /students/:studentId/progress
+# {
+#   "studentId": "uuid",
+#   "studentName": "John Doe",
+#   "courses": [
+#     {
+#       "enrollmentId": "uuid",
+#       "courseId": "uuid",
+#       "courseTitle": "Tax Fundamentals",
+#       "courseCoverImage": "/uploads/2024/01/cover.jpg",
+#       "enrollmentStatus": "ACTIVE",
+#       "progressPercentage": 33,
+#       "totalLessons": 10,
+#       "completedLessons": 3,
+#       "lastAccessedAt": "2024-01-15T10:30:00Z",
+#       "enrolledAt": "2024-01-01T00:00:00Z",
+#       "lessons": [
+#         {
+#           "lessonId": "uuid",
+#           "lessonTitle": "Introduction",
+#           "moduleTitle": "Module 1",
+#           "status": "COMPLETED",
+#           "completedAt": "2024-01-10T14:20:00Z"
+#         }
+#       ]
+#     }
+#   ]
+# }

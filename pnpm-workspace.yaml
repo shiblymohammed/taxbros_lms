@@ -1,0 +1,13 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+
+# Security patches for transitive dependencies of NestJS 10 / Express 4 (pnpm 10+ reads them here;
+# pnpm 8, pinned in package.json, reads the same list from package.json "pnpm.overrides").
+overrides:
+  "multer@<2.5.0": ">=2.5.0 <3"
+  "body-parser@<1.20.9": ">=1.20.9 <2"
+  "qs@<6.16.1": ">=6.16.1 <7"
+  "lodash@<4.18.0": ">=4.18.0 <5"
+  "js-yaml@>=4.0.0 <4.3.2": ">=4.3.2 <5"
+  "file-type@<21.3.2": ">=21.3.2 <22"

@@ -1,0 +1,60 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+*.lcov
+
+# Production
+build
+dist
+.next
+out
+
+# Environment
+.env
+.env*.local
+.env.production
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+
+# Prisma
+*.db
+*.db-journal
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Capacitor: the Android project is kept (its own .gitignore drops build output);
+# never commit signing keys or their passwords
+apps/mobile/ios/
+*.keystore
+*.jks
+keystore.properties
+
+# Uploads
+uploads/
+
+# Logs
+logs/
+*.log

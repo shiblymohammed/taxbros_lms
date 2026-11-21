@@ -1,0 +1,592 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Connection pooling is configured in the DATABASE_URL connection string
+// Format: postgresql://user:password@host:port/database?connection_limit=10
+// This limits the connection pool to 10 concurrent connections for development
+
+// ============================================================================
+// CORE MODELS - User Management and Authentication
+// ============================================================================
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMINISTRATOR
+  STAFF
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+}
+
+model User {
+  id                  String     @id @default(uuid())
+  email               String     @unique
+  passwordHash        String
+  role                UserRole
+  status              UserStatus @default(PENDING)
+  mustChangePassword  Boolean    @default(true)
+  lastLoginAt         DateTime?
+  passwordResetToken  String?
+  passwordResetExpiry DateTime?
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+  createdBy           String?
+
+  // Relations
+  studentProfile Student?
+  staffProfile   Staff?
+  refreshTokens  RefreshToken[]
+
+  // Indexes
+  @@index([email])
+  @@index([role, status])
+  @@index([lockedUntil])
+  @@map("users")
+}
+
+model Student {
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  admissionId   String    @unique
+  firstName     String
+  lastName      String
+  dateOfBirth   DateTime?
+  gender        String?
+  phoneNumber   String?
+  address       String?
+  city          String?
+  state         String?
+  pincode       String?
+  admissionDate DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Relations
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  classEnrollments  ClassEnrollment[]
+  attendanceRecords StudentAttendance[]
+  courseEnrollments CourseEnrollment[]
+  lessonProgress    LessonProgress[]
+  quizAttempts      QuizAttempt[]
+  labAttempts       LabAttempt[]
+
+  // Indexes
+  @@index([admissionId])
+  @@index([userId])
+  @@map("students")
+}
+
+enum StaffCategory {
+  TEACHING
+  NON_TEACHING
+}
+
+// R3.2 permission types (MANAGE_LABS is an extra for the lab simulations)
+enum StaffPermissionType {
+  MARK_ATTENDANCE
+  VIEW_REPORTS
+  MANAGE_COURSES
+  MANAGE_STUDENTS
+  MANAGE_STAFF
+  MANAGE_CLASSES
+  MANAGE_LABS
+}
+
+model Staff {
+  id          String        @id @default(uuid())
+  userId      String        @unique
+  staffId     String        @unique
+  firstName   String
+  lastName    String
+  designation String
+  department  String
+  category    StaffCategory
+  joiningDate DateTime
+  phoneNumber String?
+  address     String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permissions       StaffPermission[]
+  attendanceRecords StaffAttendance[]
+
+  // Indexes
+  @@index([staffId])
+  @@index([userId])
+  @@index([department])
+  @@index([category])
+  @@map("staff")
+}
+
+model StaffPermission {
+  id         String              @id @default(uuid())
+  staffId    String
+  permission StaffPermissionType
+  grantedBy  String
+  grantedAt  DateTime            @default(now())
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  // Relations
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([staffId, permission])
+  @@index([staffId])
+  @@map("staff_permissions")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
+}
+
+// ============================================================================
+// CLASS MANAGEMENT - Class and ClassEnrollment Models
+// ============================================================================
+
+enum ClassStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model Class {
+  id          String      @id @default(uuid())
+  name        String      @unique
+  description String?
+  status      ClassStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  enrollments         ClassEnrollment[]
+  attendanceRegisters StudentAttendanceRegister[]
+
+  // Indexes
+  @@index([name])
+  @@index([status])
+  @@map("classes")
+}
+
+model ClassEnrollment {
+  id         String           @id @default(uuid())
+  studentId  String
+  classId    String
+  status     EnrollmentStatus @default(ACTIVE)
+  enrolledAt DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  class   Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([studentId, classId])
+  @@index([studentId])
+  @@index([classId])
+  @@index([status])
+  @@map("class_enrollments")
+}
+
+// ============================================================================
+// ATTENDANCE MANAGEMENT - Student and Staff Attendance Models
+// ============================================================================
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+}
+
+enum RegisterStatus {
+  DRAFT
+  SAVED
+}
+
+model StudentAttendanceRegister {
+  id             String         @id @default(uuid())
+  classId        String
+  attendanceDate DateTime       @db.Date
+  rosterSnapshot Json // JSON array of student IDs
+  status         RegisterStatus @default(DRAFT)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  // Relations
+  class             Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
+  attendanceRecords StudentAttendance[]
+
+  // Indexes and Constraints
+  @@unique([classId, attendanceDate])
+  @@index([classId, attendanceDate])
+  @@map("student_attendance_registers")
+}
+
+model StudentAttendance {
+  id         String           @id @default(uuid())
+  registerId String
+  studentId  String
+  status     AttendanceStatus
+  remarks    String?
+  markedBy   String
+  markedAt   DateTime         @default(now())
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  // Relations
+  register StudentAttendanceRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  student  Student                   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([registerId, studentId])
+  @@index([registerId])
+  @@index([studentId])
+  @@map("student_attendance")
+}
+
+model StaffAttendance {
+  id             String           @id @default(uuid())
+  staffId        String
+  attendanceDate DateTime         @db.Date
+  status         AttendanceStatus
+  remarks        String?
+  markedBy       String
+  markedAt       DateTime         @default(now())
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relations
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([staffId, attendanceDate])
+  @@index([staffId])
+  @@index([attendanceDate])
+  @@map("staff_attendance")
+}
+
+// ============================================================================
+// COURSE MANAGEMENT - Course, Module, and Lesson Models
+// ============================================================================
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+}
+
+model Course {
+  id           String       @id @default(uuid())
+  title        String
+  description  String?
+  coverImage   String?
+  status       CourseStatus @default(DRAFT)
+  displayOrder Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  createdBy    String?
+
+  // Relations
+  modules     CourseModule[]
+  enrollments CourseEnrollment[]
+
+  // Indexes
+  @@index([status])
+  @@index([displayOrder])
+  @@map("courses")
+}
+
+model CourseModule {
+  id           String   @id @default(uuid())
+  courseId     String
+  title        String
+  description  String?
+  displayOrder Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  // Relations
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  // Indexes
+  @@index([courseId])
+  @@index([courseId, displayOrder])
+  @@map("course_modules")
+}
+
+model Lesson {
+  id           String       @id @default(uuid())
+  moduleId     String
+  title        String
+  description  String?
+  videoUrl     String
+  duration     Int? // Duration in seconds
+  status       LessonStatus @default(DRAFT)
+  displayOrder Int          @default(0)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  // Relations
+  module         CourseModule     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  lessonProgress LessonProgress[]
+
+  // Indexes
+  @@index([moduleId])
+  @@index([moduleId, displayOrder])
+  @@index([status])
+  @@map("lessons")
+}
+
+enum CourseEnrollmentStatus {
+  ACTIVE
+  DROPPED
+  COMPLETED
+}
+
+model CourseEnrollment {
+  id                 String                 @id @default(uuid())
+  studentId          String
+  courseId           String
+  status             CourseEnrollmentStatus @default(ACTIVE)
+  progressPercentage Int                    @default(0)
+  lastAccessedAt     DateTime?
+  enrolledAt         DateTime               @default(now())
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([studentId, courseId])
+  @@index([studentId])
+  @@index([courseId])
+  @@index([status])
+  @@map("course_enrollments")
+}
+
+enum LessonProgressStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+model LessonProgress {
+  id              String               @id @default(uuid())
+  studentId       String
+  lessonId        String
+  status          LessonProgressStatus @default(NOT_STARTED)
+  lastPosition    Int                  @default(0) // Position in seconds
+  watchedDuration Int                  @default(0) // Total watched time in seconds
+  completedAt     DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  // Relations
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lesson  Lesson  @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  // Indexes and Constraints
+  @@unique([studentId, lessonId])
+  @@index([studentId])
+  @@index([lessonId])
+  @@index([status])
+  @@map("lesson_progress")
+}
+
+// ============================================================================
+// QUIZ/ASSESSMENT MANAGEMENT - Quiz, Question, and Attempt Models
+// ============================================================================
+
+enum QuizAttachmentType {
+  COURSE
+  MODULE
+  LESSON
+}
+
+enum QuizStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model Quiz {
+  id             String             @id @default(uuid())
+  title          String
+  description    String?
+  attachmentType QuizAttachmentType
+  courseId       String? // Set when attachmentType is COURSE
+  moduleId       String? // Set when attachmentType is MODULE
+  lessonId       String? // Set when attachmentType is LESSON
+  passMark       Int // Minimum score required to pass
+  totalMarks     Int // Total marks available
+  timeLimit      Int? // Time limit in minutes (nullable - no limit if null)
+  maxAttempts    Int? // Maximum attempts allowed (nullable - unlimited if null)
+  status         QuizStatus         @default(DRAFT)
+  displayOrder   Int                @default(0)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  createdBy      String?
+
+  // Relations
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  // Indexes
+  @@index([courseId])
+  @@index([moduleId])
+  @@index([lessonId])
+  @@index([status])
+  @@index([attachmentType])
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id            String   @id @default(uuid())
+  quizId        String
+  questionText  String
+  options       Json // JSON array of option objects: [{ id: string, text: string }]
+  correctAnswer String // ID of the correct option from options array
+  marks         Int      @default(1)
+  displayOrder  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([quizId])
+  @@index([quizId, displayOrder])
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id          String   @id @default(uuid())
+  quizId      String
+  studentId   String
+  answers     Json // JSON array: [{ questionId: string, selectedAnswer: string }]
+  score       Int // Total marks earned
+  passed      Boolean // True if score >= passMark
+  startedAt   DateTime @default(now())
+  submittedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  quiz    Quiz    @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([quizId])
+  @@index([studentId])
+  @@index([quizId, studentId])
+  @@map("quiz_attempts")
+}
+
+// ============================================================================
+// LAB SIMULATION MANAGEMENT - Lab and LabAttempt Models
+// ============================================================================
+
+enum LabType {
+  GST_REGISTRATION
+  INCOME_TAX_RETURN
+  MCA_INCORPORATION
+}
+
+model Lab {
+  id          String   @id @default(uuid())
+  type        LabType  @unique
+  title       String
+  description String?
+  sampleData  Json // JSON object containing fictional sample data for the lab
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  updatedBy   String? // User ID of the last person to change the sample data (R27.4)
+
+  // Relations
+  attempts LabAttempt[]
+
+  // Indexes
+  @@index([type])
+  @@index([isActive])
+  @@map("labs")
+}
+
+model LabAttempt {
+  id          String   @id @default(uuid())
+  labId       String
+  studentId   String
+  formData    Json // JSON object containing the submitted form data
+  result      Json // JSON object containing the generated result (GSTIN, ARN, CIN, etc.)
+  completedAt DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  lab     Lab     @relation(fields: [labId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Indexes
+  @@index([labId, studentId])
+  @@index([labId])
+  @@index([studentId])
+  @@map("lab_attempts")
+}
+
+// ============================================
+// INSTITUTE SETTINGS (R6)
+// ============================================
+
+model InstituteSetting {
+  key       String   @id
+  value     String
+  updatedBy String? // User ID of the administrator who last changed it (R6.3)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt // stored in UTC (R6.7)
+
+  @@map("institute_settings")
+}
