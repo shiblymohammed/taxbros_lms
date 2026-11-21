@@ -10,7 +10,7 @@ completed once the production server, the Android signing key and the institute'
 | 1 | Hosted URL with sign-in details for all three roles | Section 1 | **To supply** after deployment |
 | 2 | PWA installation instructions (Chrome/Edge) | Section 2 | Ready |
 | 3 | Android APK and installation guide | `apps/mobile/README.md`, section 3 | Guide ready; **APK to build** |
-| 4 | Source code | This folder (`taxbros-lms/`) | Ready; put under version control (section 4) |
+| 4 | Source code | Git repository in `taxbros-lms/` (local, 2 commits) | Ready; **push to a private remote** (section 4) |
 | 5 | Database backup file | `deploy/scripts/backup-db.sh` | **To supply**: first backup after go-live |
 | 6 | Environment configuration templates | `apps/api/.env.example`, `apps/web/.env.example`, `apps/mobile/.env.example` | Ready |
 | 7 | Build and deployment scripts | `deploy/` (PM2, Nginx, deploy, backup, restore), `docs/DEPLOYMENT.md` | Ready |
@@ -59,15 +59,15 @@ Android SDK isn't: open Android Studio once, let it install the SDK (accepting G
 
 ## 4. Source code
 
-The project folder is not under version control yet. Before handover:
+The project is a git repository (first commit `e14b017`, 21 Nov 2026) with no remote yet. Create a
+private repository the institute owns, then:
 
 ```bash
-git init
-git add .
-git commit -m "TAXBROS LMS handover"
+git remote add origin <repository URL>
+git push -u origin master
 ```
 
-Then push to a private repository the institute owns. `.gitignore` leaves out `node_modules`, build
+Every commit runs both test suites first (husky pre-commit hook). `.gitignore` leaves out `node_modules`, build
 output, `.env` files, uploads and signing keys. Never commit `.env`, the keystore or `keystore.properties`.
 
 ## 5. Backups

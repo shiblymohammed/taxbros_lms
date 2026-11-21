@@ -118,6 +118,13 @@ Checked type-checks, both test suites, lint, migrations, dependencies, API route
 - **Reports race:** quickly changing report filters could let an older response overwrite the newer table; only the latest request now updates it.
 - **Verified clean:** all 11 migrations replay on an empty database with no drift; lockfile matches; no duplicate API routes; every web API call matches a route; end-to-end test files compile.
 
+### Tasks 65–77 (21 Nov, sixth pass)
+
+- **Task 76:** the source is now in a local git repository (`e14b017` initial commit, `c94830d` line-ending fix so `gradlew` and the husky hook keep Unix line endings). No secrets or build output are committed; there is no remote yet.
+- **Tasks 66, 68, 69:** no production server exists yet. Deployment scripts and `docs/DEPLOYMENT.md` are ready for when one does.
+- **Task 65:** the owner will install the Android SDK (open Android Studio once); then the APK can be built.
+- **Tasks 75 and 77:** everything checkable locally passes; the hosted and APK checks wait on the two items above.
+
 ### Still open
 
 - **Tasks 65, 66, 68, 69:** need the production server and domain, the Android SDK (Android Studio is installed; open it once to install the SDK), the signing key and a phone.
