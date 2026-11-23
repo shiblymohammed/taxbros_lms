@@ -18,8 +18,8 @@ import {
   validateFictionalPan,
 } from '@/lib/lab-validation';
 import { useToast } from '@/hooks/use-toast';
-import { SimulationWarning } from '@/components/labs/simulation-warning';
-import { FormField } from '@/components/labs/form-field';
+import { SimulationWarning } from '@/components/features/labs/simulation-warning';
+import { FormField } from '@/components/features/labs/form-field';
 
 /**
  * Income Tax Return filing lab (Task 55, Requirement R29)
@@ -177,7 +177,7 @@ export default function ItrFilingLabPage() {
   const calc = result?.calculation ?? preview;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
+    <div className="py-6 sm:py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
@@ -334,7 +334,7 @@ export default function ItrFilingLabPage() {
               </CardContent>
             </Card>
 
-            <Card className="lg:col-span-2 h-fit lg:sticky lg:top-6">
+            <Card className="lg:col-span-2 h-fit lg:sticky lg:top-20">
               <CardHeader>
                 <div className="flex items-center gap-2">
                   <Calculator className="h-5 w-5 text-green-600" />
@@ -349,10 +349,10 @@ export default function ItrFilingLabPage() {
           </div>
         )}
 
-        <Card className="mt-6 bg-blue-50 border-blue-200">
+        <Card className="mt-6 bg-brand-soft/50 border-brand-soft">
           <CardContent className="pt-6">
-            <h3 className="font-semibold text-blue-900 mb-2">About this Lab</h3>
-            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <h3 className="font-semibold text-brand-strong mb-2">About this Lab</h3>
+            <ul className="text-sm text-brand-strong space-y-1 list-disc list-inside">
               <li>The calculation uses simplified, illustrative slabs, not current tax law</li>
               <li>Acknowledgement numbers are generated randomly and are fictional</li>
               <li>No data from this simulation is sent to the Income Tax Department</li>

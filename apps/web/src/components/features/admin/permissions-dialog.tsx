@@ -87,7 +87,7 @@ export function PermissionsDialog({ staff, onClose }: PermissionsDialogProps) {
                   <label className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-gray-50">
                     <input
                       type="checkbox"
-                      className="mt-0.5 h-5 w-5 shrink-0 accent-blue-600"
+                      className="mt-0.5 h-5 w-5 shrink-0 accent-brand"
                       checked={on}
                       disabled={busy !== null}
                       onChange={() => toggle(p.value)}

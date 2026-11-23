@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { QuestionEditor } from '@/components/admin/question-editor';
+import { QuestionEditor } from '@/components/features/admin/question-editor';
 import { useToast } from '@/hooks/use-toast';
 import { marksSummary, quizAdminApi, type AdminQuiz, type QuestionPayload } from '@/lib/admin-api';
 import { getApiErrorMessage } from '@/lib/lab-validation';

@@ -23,7 +23,7 @@ const LAB_ROUTES = {
 };
 
 const LAB_COLORS = {
-  GST_REGISTRATION: 'from-blue-500 to-cyan-600',
+  GST_REGISTRATION: 'from-brand to-cyan-600',
   INCOME_TAX_RETURN: 'from-green-500 to-emerald-600',
   MCA_INCORPORATION: 'from-purple-500 to-indigo-600',
 };
@@ -71,7 +71,7 @@ export default function LabsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="py-6 sm:py-8">
       <div className="max-w-7xl mx-auto px-4">
         {/* Header */}
         <div className="mb-8">
@@ -164,12 +164,12 @@ export default function LabsPage() {
         )}
 
         {/* Info Section */}
-        <Card className="mt-8 bg-blue-50 border-blue-200">
+        <Card className="mt-8 bg-brand-soft/50 border-brand-soft">
           <CardHeader>
-            <CardTitle className="text-blue-900">About Practice Labs</CardTitle>
+            <CardTitle className="text-brand-strong">About Practice Labs</CardTitle>
           </CardHeader>
           <CardContent>
-            <ul className="text-sm text-blue-800 space-y-2 list-disc list-inside">
+            <ul className="text-sm text-brand-strong space-y-2 list-disc list-inside">
               <li>
                 <strong>Safe Environment:</strong> Practice without fear of mistakes affecting real systems
               </li>

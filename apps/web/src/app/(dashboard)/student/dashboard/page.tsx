@@ -2,12 +2,25 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { apiClient, quizzesApi, type Quiz, type QuizAttemptSummary } from '@/lib/api';
-import { Loader2, BookOpen, ClipboardCheck, Trophy, Clock, PlayCircle } from 'lucide-react';
+import Link from 'next/link';
+import {
+  BookOpen,
+  CheckCircle2,
+  ChevronRight,
+  Circle,
+  ClipboardCheck,
+  Clock,
+  FlaskConical,
+  Loader2,
+  Play,
+  Target,
+  Trophy,
+} from 'lucide-react';
+import { CourseProgressCard, ProgressBar } from '@/components/features/courses/course-progress-card';
+import { PageContainer } from '@/components/layout/page-header';
+import { apiClient, quizzesApi, type Quiz } from '@/lib/api';
+import { continueCourse, greeting } from '@/hooks/use-student-progress';
+import { cn } from '@/lib/utils';
 
 interface Course {
   enrollmentId: string;
@@ -48,7 +61,6 @@ export default function StudentDashboardPage() {
   const [progress, setProgress] = useState<StudentProgress | null>(null);
   const [nextLessons, setNextLessons] = useState<Map<string, NextLesson>>(new Map());
   const [availableQuizzes, setAvailableQuizzes] = useState<AvailableQuiz[]>([]);
-  const [quizAttempts, setQuizAttempts] = useState<Map<string, QuizAttemptSummary[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -118,13 +130,11 @@ export default function StudentDashboardPage() {
           });
 
           // Fetch attempt history for each quiz
-          const attemptsMap = new Map<string, QuizAttemptSummary[]>();
           const enrichedQuizzes: AvailableQuiz[] = [];
           
           for (const quiz of enrolledQuizzes) {
             try {
               const attempts = await quizzesApi.getQuizAttempts(quiz.id);
-              attemptsMap.set(quiz.id, attempts);
               
               // Calculate best score and attempt count
               const bestAttempt = attempts.reduce((best, current) => {
@@ -159,7 +169,6 @@ export default function StudentDashboardPage() {
           }
           
           setAvailableQuizzes(enrichedQuizzes);
-          setQuizAttempts(attemptsMap);
         } catch (err) {
           console.error('Failed to fetch quizzes:', err);
         }
@@ -174,10 +183,6 @@ export default function StudentDashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const handleCourseClick = (courseId: string) => {
-    router.push(`/student/courses/${courseId}`);
-  };
-
   const handleContinueLearning = (courseId: string) => {
     const nextLesson = nextLessons.get(courseId);
     if (nextLesson) {
@@ -187,302 +192,250 @@ export default function StudentDashboardPage() {
     }
   };
 
-  const handleQuizClick = (quizId: string) => {
-    router.push(`/student/quizzes/${quizId}`);
-  };
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      <div className="flex min-h-[60vh] items-center justify-center" role="status">
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+        <span className="sr-only">Loading your dashboard…</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-red-600 text-lg">{error}</p>
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center" role="alert">
+        <p className="text-lg text-red-600">{error}</p>
       </div>
     );
   }
 
-  const activeCourses = progress?.courses.filter(c => c.enrollmentStatus === 'ACTIVE') || [];
+  const courses = progress?.courses ?? [];
+  const activeCourses = courses.filter((c) => c.enrollmentStatus === 'ACTIVE');
+  const completedCount = courses.filter((c) => c.enrollmentStatus === 'COMPLETED' || c.progressPercentage >= 100).length;
+  const current = continueCourse(courses);
+  const currentNext = current ? nextLessons.get(current.courseId) : undefined;
+  const pendingQuizzes = availableQuizzes.filter((q) => !q.bestAttemptPassed);
+  const firstName = (progress?.studentName || 'Student').split(' ')[0];
+
+  // This week's focus: the next lesson in each course, then quizzes still to pass
+  const focus = [
+    ...activeCourses
+      .map((c) => ({ course: c, next: nextLessons.get(c.courseId) }))
+      .filter((f): f is { course: Course; next: NextLesson } => !!f.next)
+      .slice(0, 3)
+      .map(({ course, next }) => ({
+        key: `lesson-${course.courseId}`,
+        label: `Watch “${next.lessonTitle}”`,
+        hint: course.courseTitle,
+        href: `/student/courses/${course.courseId}/lessons/${next.lessonId}`,
+        done: false,
+      })),
+    ...availableQuizzes.slice(0, 3).map((q) => ({
+      key: `quiz-${q.id}`,
+      label: q.bestAttemptPassed ? `Passed “${q.title}”` : `Attempt “${q.title}”`,
+      hint: q.courseTitle ?? '',
+      href: `/student/quizzes/${q.id}`,
+      done: q.bestAttemptPassed,
+    })),
+  ];
+
+  const tiles = [
+    { href: '/student/courses', icon: BookOpen, title: 'My Courses', text: `${activeCourses.length} enrolled`, tone: 'bg-brand-soft text-brand-strong' },
+    { href: '/student/labs', icon: FlaskConical, title: 'Practice Labs', text: 'GST · ITR · MCA', tone: 'bg-orange-50 text-flame' },
+    { href: '#quizzes', icon: ClipboardCheck, title: 'Tests & Quizzes', text: `${pendingQuizzes.length} pending`, tone: 'bg-rose-50 text-rose-500' },
+    { href: '/student/courses', icon: Trophy, title: 'Completed', text: `${completedCount} course${completedCount === 1 ? '' : 's'}`, tone: 'bg-emerald-50 text-emerald-600' },
+  ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome back, {progress?.studentName || 'Student'}!
-          </h1>
-          <p className="text-gray-600">
-            Continue your learning journey with your enrolled courses
-          </p>
-        </div>
+    <PageContainer className="space-y-6 sm:space-y-8">
+      {/* Greeting */}
+      <div>
+        <p className="text-sm text-slate-500 sm:text-base">{greeting()},</p>
+        <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
+          {firstName} <span aria-hidden="true">👋</span>
+        </h1>
+      </div>
 
-        {/* Enrolled Courses */}
-        <div className="mb-12">
-          <h2 className="text-2xl font-semibold text-gray-900 mb-4">My Courses</h2>
-          
-          {activeCourses.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <BookOpen className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600 text-lg mb-2">No active courses</p>
-                <p className="text-gray-500 text-sm">
-                  Contact your administrator to enroll in courses
-                </p>
-              </CardContent>
-            </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <div className="min-w-0 space-y-6">
+          {/* Continue learning */}
+          {current ? (
+            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-strong via-[#135d6e] to-brand p-5 text-white shadow-lg sm:p-7">
+              <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-white/10" aria-hidden="true" />
+              <div className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-white/5" aria-hidden="true" />
+              <span className="relative inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-strong">
+                <Play className="h-3 w-3 fill-current" aria-hidden="true" /> Continue Learning
+              </span>
+              <h2 className="relative mt-3 text-xl font-bold leading-tight sm:text-2xl">{current.courseTitle}</h2>
+              <p className="relative mt-1 line-clamp-1 text-sm text-white/75">
+                {currentNext
+                  ? `${currentNext.moduleTitle} · ${currentNext.lessonTitle}`
+                  : `${current.completedLessons} of ${current.totalLessons} lessons done`}
+              </p>
+              <div className="relative mt-5 flex items-end gap-4">
+                <div className="min-w-0 flex-1">
+                  <ProgressBar value={current.progressPercentage} tone="light" className="h-2" />
+                  <p className="mt-2 text-sm font-medium text-white/90">{current.progressPercentage}% completed</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleContinueLearning(current.courseId)}
+                  aria-label={`Continue ${current.courseTitle}`}
+                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand-strong shadow-md transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+                >
+                  <Play className="h-5 w-5 fill-current" />
+                </button>
+              </div>
+            </section>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeCourses.map((course) => {
-                const nextLesson = nextLessons.get(course.courseId);
-                return (
-                  <Card
-                    key={course.enrollmentId}
-                    className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => handleCourseClick(course.courseId)}
-                  >
-                    {/* Course Cover Image */}
-                    {course.courseCoverImage ? (
-                      <div className="relative w-full h-48">
-                        <Image
-                          src={course.courseCoverImage}
-                          alt={course.courseTitle}
-                          fill
-                          className="object-cover rounded-t-lg"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
-                        <BookOpen className="h-16 w-16 text-white opacity-80" />
-                      </div>
-                    )}
+            <section className="rounded-3xl border border-dashed bg-white p-8 text-center">
+              <BookOpen className="mx-auto h-10 w-10 text-slate-300" aria-hidden="true" />
+              <p className="mt-3 font-semibold text-slate-800">
+                {activeCourses.length === 0 ? 'No active courses yet' : 'All caught up!'}
+              </p>
+              <p className="mt-1 text-sm text-slate-500">
+                {activeCourses.length === 0
+                  ? 'Ask your administrator to enrol you in a course.'
+                  : 'You have finished every lesson in your courses.'}
+              </p>
+            </section>
+          )}
 
-                    <CardHeader>
-                      <CardTitle className="text-xl line-clamp-2">
-                        {course.courseTitle}
-                      </CardTitle>
-                      <CardDescription>
-                        {course.completedLessons} of {course.totalLessons} lessons completed
-                      </CardDescription>
-                    </CardHeader>
+          {/* Quick tiles */}
+          <section aria-label="Shortcuts" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
+            {tiles.map(({ href, icon: Icon, title, text, tone }) => (
+              <Link
+                key={title}
+                href={href}
+                className="rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tone)}>
+                  <Icon className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <p className="mt-3 text-sm font-bold text-slate-900">{title}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{text}</p>
+              </Link>
+            ))}
+          </section>
 
-                    <CardContent>
-                      {/* Progress Bar */}
-                      <div className="mb-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">
-                            Progress
-                          </span>
-                          <span className="text-sm font-semibold text-gray-900">
-                            {course.progressPercentage}%
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${course.progressPercentage}%` }}
-                          />
-                        </div>
-                      </div>
-
-                      {/* Next Lesson Preview */}
-                      {nextLesson && (
-                        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                          <div className="flex items-start gap-2">
-                            <PlayCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs font-medium text-blue-900 mb-1">
-                                Up Next:
-                              </p>
-                              <p className="text-sm text-blue-800 line-clamp-2">
-                                {nextLesson.lessonTitle}
-                              </p>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Continue Button */}
-                      <Button
-                        className="w-full"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleContinueLearning(course.courseId);
-                        }}
-                      >
-                        {course.progressPercentage === 0 ? 'Start Course' : 'Continue Learning'}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+          {/* Courses */}
+          {activeCourses.length > 0 && (
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-slate-900">My Courses</h2>
+                <Link href="/student/courses" className="text-sm font-semibold text-brand hover:underline">
+                  View all
+                </Link>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                {activeCourses.slice(0, 4).map((course) => (
+                  <CourseProgressCard key={course.enrollmentId} course={course} href={`/student/courses/${course.courseId}`} />
+                ))}
+              </div>
+            </section>
           )}
         </div>
 
-        {/* Available Quizzes */}
-        {availableQuizzes.length > 0 && (
-          <div className="mb-12">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Available Quizzes</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {availableQuizzes.map((quiz) => {
-                const attempts = quizAttempts.get(quiz.id) || [];
-                const passedAttempts = attempts.filter(a => a.passed).length;
-                
-                return (
-                  <Card
-                    key={quiz.id}
-                    className="hover:shadow-lg transition-shadow cursor-pointer"
-                    onClick={() => handleQuizClick(quiz.id)}
-                  >
-                    <div className="w-full h-32 bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center relative">
-                      <ClipboardCheck className="h-16 w-16 text-white opacity-80" />
-                      {quiz.bestAttemptPassed && (
-                        <div className="absolute top-3 right-3">
-                          <Trophy className="h-6 w-6 text-yellow-300" />
-                        </div>
-                      )}
-                    </div>
-
-                    <CardHeader>
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <CardTitle className="text-lg line-clamp-2 flex-1">
-                          {quiz.title}
-                        </CardTitle>
-                        {quiz.bestAttemptPassed ? (
-                          <Badge className="bg-green-100 text-green-800 border-green-200">
-                            Passed
-                          </Badge>
-                        ) : quiz.attemptCount > 0 ? (
-                          <Badge variant="outline" className="border-orange-200 text-orange-800">
-                            In Progress
-                          </Badge>
-                        ) : (
-                          <Badge variant="outline">New</Badge>
-                        )}
-                      </div>
-                      <CardDescription className="line-clamp-1">
-                        {quiz.courseTitle}
-                      </CardDescription>
-                    </CardHeader>
-
-                    <CardContent className="space-y-3">
-                      {/* Quiz Stats */}
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Total Marks:</span>
-                        <span className="font-semibold text-gray-900">{quiz.totalMarks}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-600">Pass Mark:</span>
-                        <span className="font-semibold text-gray-900">{quiz.passMark}</span>
-                      </div>
-                      {quiz.timeLimit && (
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="text-gray-600">Time Limit:</span>
-                          <span className="font-semibold text-gray-900 flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {quiz.timeLimit} min
-                          </span>
-                        </div>
-                      )}
-
-                      {/* Attempt Summary */}
-                      {quiz.attemptCount > 0 && (
-                        <div className="pt-3 border-t border-gray-200">
-                          <div className="flex items-center justify-between text-sm mb-1">
-                            <span className="text-gray-600">Best Score:</span>
-                            <span className="font-bold text-blue-600">
-                              {quiz.bestScore}/{quiz.totalMarks}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Attempts:</span>
-                            <span className="font-semibold text-gray-900">
-                              {quiz.attemptCount}
-                              {quiz.maxAttempts && ` / ${quiz.maxAttempts}`}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm">
-                            <span className="text-gray-600">Passed:</span>
-                            <span className="font-semibold text-green-600">
-                              {passedAttempts}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Action Button */}
-                      <Button
-                        className="w-full mt-4"
-                        variant={quiz.bestAttemptPassed ? "outline" : "default"}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleQuizClick(quiz.id);
-                        }}
-                      >
-                        {quiz.attemptCount === 0 ? 'Take Quiz' : quiz.bestAttemptPassed ? 'Review Quiz' : 'Retake Quiz'}
-                      </Button>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+        <aside className="min-w-0 space-y-6">
+          {/* This week's focus */}
+          <section className="rounded-2xl border bg-white p-5 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-strong">
+                <Target className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <h2 className="text-base font-bold text-slate-900">This Week&apos;s Focus</h2>
             </div>
-          </div>
-        )}
-
-        {/* Completed Courses Section */}
-        {progress?.courses.some(c => c.enrollmentStatus === 'COMPLETED') && (
-          <div className="mt-12">
-            <h2 className="text-2xl font-semibold text-gray-900 mb-4">Completed Courses</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {progress.courses
-                .filter(c => c.enrollmentStatus === 'COMPLETED')
-                .map((course) => (
-                  <Card
-                    key={course.enrollmentId}
-                    className="hover:shadow-lg transition-shadow cursor-pointer opacity-75"
-                    onClick={() => handleCourseClick(course.courseId)}
-                  >
-                    {course.courseCoverImage ? (
-                      <div className="relative w-full h-48">
-                        <Image
-                          src={course.courseCoverImage}
-                          alt={course.courseTitle}
-                          fill
-                          className="object-cover rounded-t-lg"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-full h-48 bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center">
-                        <BookOpen className="h-16 w-16 text-white opacity-80" />
-                      </div>
-                    )}
-
-                    <CardHeader>
-                      <CardTitle className="text-xl line-clamp-2">
-                        {course.courseTitle}
-                      </CardTitle>
-                      <CardDescription className="text-green-600 font-medium">
-                        Completed ✓
-                      </CardDescription>
-                    </CardHeader>
-
-                    <CardContent>
-                      <Button variant="outline" className="w-full">
-                        Review Course
-                      </Button>
-                    </CardContent>
-                  </Card>
+            {focus.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">Nothing pending. Great work!</p>
+            ) : (
+              <ul className="divide-y">
+                {focus.map((f) => (
+                  <li key={f.key}>
+                    <Link
+                      href={f.href}
+                      className="group flex items-start gap-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      {f.done ? (
+                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-label="Done" />
+                      ) : (
+                        <Circle className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" aria-label="To do" />
+                      )}
+                      <span className="min-w-0 flex-1">
+                        <span
+                          className={cn(
+                            'block text-sm font-medium text-slate-800 group-hover:text-brand-strong',
+                            f.done && 'text-slate-400 line-through',
+                          )}
+                        >
+                          {f.label}
+                        </span>
+                        {f.hint && <span className="block truncate text-xs text-slate-500">{f.hint}</span>}
+                      </span>
+                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
+                    </Link>
+                  </li>
                 ))}
-            </div>
-          </div>
-        )}
+              </ul>
+            )}
+          </section>
+
+          {/* Quizzes */}
+          <section id="quizzes" className="scroll-mt-24 rounded-2xl border bg-white p-5 shadow-sm">
+            <h2 className="mb-3 text-base font-bold text-slate-900">Tests &amp; Quizzes</h2>
+            {availableQuizzes.length === 0 ? (
+              <p className="py-4 text-sm text-slate-500">No quizzes available yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {availableQuizzes.map((quiz) => (
+                  <li key={quiz.id}>
+                    <Link
+                      href={`/student/quizzes/${quiz.id}`}
+                      className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    >
+                      <span
+                        className={cn(
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
+                          quiz.bestAttemptPassed ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500',
+                        )}
+                      >
+                        {quiz.bestAttemptPassed ? <Trophy className="h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{quiz.title}</span>
+                        <span className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
+                          <span>{quiz.totalMarks} marks</span>
+                          {quiz.timeLimit && (
+                            <span className="inline-flex items-center gap-0.5">
+                              <Clock className="h-3 w-3" aria-hidden="true" /> {quiz.timeLimit} min
+                            </span>
+                          )}
+                          {quiz.attemptCount > 0 && (
+                            <span>
+                              Best {quiz.bestScore}/{quiz.totalMarks}
+                            </span>
+                          )}
+                        </span>
+                      </span>
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold',
+                          quiz.bestAttemptPassed
+                            ? 'bg-emerald-50 text-emerald-700'
+                            : quiz.attemptCount > 0
+                              ? 'bg-amber-50 text-amber-700'
+                              : 'bg-brand-soft text-brand-strong',
+                        )}
+                      >
+                        {quiz.bestAttemptPassed ? 'Passed' : quiz.attemptCount > 0 ? 'Retake' : 'Start'}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </aside>
       </div>
-    </div>
+    </PageContainer>
   );
 }

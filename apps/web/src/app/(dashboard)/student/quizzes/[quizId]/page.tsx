@@ -238,7 +238,7 @@ export default function QuizTakingPage() {
       </div>
 
       {/* Quiz Info Card */}
-      <Card className="mb-6 border-blue-200 bg-blue-50">
+      <Card className="mb-6 border-brand-soft bg-brand-soft/50">
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div>
@@ -283,7 +283,7 @@ export default function QuizTakingPage() {
           </div>
           <div className="w-full bg-gray-200 rounded-full h-2">
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+              className="bg-brand h-2 rounded-full transition-all duration-300"
               style={{ width: `${(answeredCount / totalQuestions) * 100}%` }}
             />
           </div>
@@ -343,7 +343,7 @@ export default function QuizTakingPage() {
                           key={option.id}
                           className={`flex items-center space-x-3 p-3 rounded-lg border transition-colors ${
                             answers.get(question.id) === option.id
-                              ? 'bg-blue-100 border-blue-300'
+                              ? 'bg-brand-soft border-brand-soft'
                               : 'bg-white border-gray-200 hover:bg-gray-50'
                           }`}
                         >
@@ -371,7 +371,7 @@ export default function QuizTakingPage() {
       </div>
 
       {/* Submit Button */}
-      <Card className="sticky bottom-4 shadow-lg">
+      <Card className="sticky bottom-24 shadow-lg lg:bottom-4">
         <CardContent className="pt-6">
           <div className="flex items-center justify-between gap-4">
             <div>

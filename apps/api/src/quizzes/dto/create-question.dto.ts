@@ -1,4 +1,15 @@
-import { IsString, IsNotEmpty, IsArray, IsInt, Min, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsArray,
+  IsInt,
+  Min,
+  IsOptional,
+  ValidateNested,
+  ArrayMinSize,
+  ArrayMaxSize,
+} from 'class-validator';
+import { Type } from 'class-transformer';
 
 /**
  * DTO for creating a quiz question
@@ -25,8 +36,13 @@ export class CreateQuestionDto {
   @IsNotEmpty()
   questionText: string;
 
+  // @Type is required: without it the global pipe's implicit conversion turns each option
+  // into an empty array, and the options are saved as [] (R24.2)
   @IsArray()
-  @IsNotEmpty()
+  @ArrayMinSize(2)
+  @ArrayMaxSize(6)
+  @ValidateNested({ each: true })
+  @Type(() => QuizOptionDto)
   options: QuizOptionDto[];
 
   @IsString()

@@ -11,8 +11,8 @@ import { Loader2, CheckCircle2, FileText } from 'lucide-react';
 import { labsApi, type Lab, type GstFormData, type GstResult } from '@/lib/api';
 import { getApiErrorMessage, validateFictionalPan } from '@/lib/lab-validation';
 import { useToast } from '@/hooks/use-toast';
-import { SimulationWarning } from '@/components/labs/simulation-warning';
-import { DummyChecklist, allChecked } from '@/components/labs/dummy-checklist';
+import { SimulationWarning } from '@/components/features/labs/simulation-warning';
+import { DummyChecklist, allChecked } from '@/components/features/labs/dummy-checklist';
 
 const CHECKLIST = [
   'Proof of business address (dummy electricity bill)',
@@ -183,12 +183,12 @@ export default function GstRegistrationLabPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
+    <div className="py-6 sm:py-8">
       <div className="max-w-4xl mx-auto px-4">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-blue-600 shrink-0" />
+            <FileText className="h-7 w-7 sm:h-8 sm:w-8 text-brand shrink-0" />
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">{lab.title}</h1>
           </div>
           {lab.description && (
@@ -395,10 +395,10 @@ export default function GstRegistrationLabPage() {
         )}
 
         {/* Info Card */}
-        <Card className="mt-6 bg-blue-50 border-blue-200">
+        <Card className="mt-6 bg-brand-soft/50 border-brand-soft">
           <CardContent className="pt-6">
-            <h3 className="font-semibold text-blue-900 mb-2">About this Lab</h3>
-            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <h3 className="font-semibold text-brand-strong mb-2">About this Lab</h3>
+            <ul className="text-sm text-brand-strong space-y-1 list-disc list-inside">
               <li>This simulation demonstrates the GST registration process</li>
               <li>All generated GSTIN and ARN numbers are fictional</li>
               <li>The form imitates the kind of information a registration asks for</li>

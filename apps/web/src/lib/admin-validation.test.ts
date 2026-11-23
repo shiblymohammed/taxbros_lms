@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { generateTemporaryPassword, marksSummary } from './admin-api';
 import { meetsPasswordPolicy } from './password-policy';
-import { validateUserForm } from '@/components/admin/user-form-dialog';
-import { validateQuestion } from '@/components/admin/question-editor';
-import { emptyQuizSettings, toQuizPayload } from '@/components/admin/quiz-settings-form';
+import { validateUserForm } from '@/components/features/admin/user-form-dialog';
+import { normaliseOptions, validateQuestion } from '@/components/features/admin/question-editor';
+import { emptyQuizSettings, toQuizPayload } from '@/components/features/admin/quiz-settings-form';
 
 describe('password policy (mirrors the API, R36.2)', () => {
   it('accepts strong and rejects weak passwords', () => {
@@ -96,5 +96,23 @@ describe('marksSummary (R24.8)', () => {
     expect(marksSummary({ totalMarks: 3, questions: [{ marks: 1 }, { marks: 2 }] })).toEqual({ sum: 3, matches: true });
     expect(marksSummary({ totalMarks: 5, questions: [{ marks: 1 }] }).matches).toBe(false);
     expect(marksSummary({ totalMarks: 0, questions: [] }).matches).toBe(false);
+  });
+});
+
+describe('normaliseOptions (editing saved questions)', () => {
+  it('keeps valid options as independent copies', () => {
+    const saved = [{ id: 'a', text: 'GSTR-1' }, { id: 'b', text: 'GSTR-3B' }];
+    const copy = normaliseOptions(saved);
+    expect(copy).toEqual(saved);
+    expect(copy[0]).not.toBe(saved[0]);
+  });
+
+  it('gives options saved without ids (old API bug) their own ids, so their fields are independent', () => {
+    const fixed = normaliseOptions([[], [], {}, { id: 'x', text: 'Kept' }, { id: 'x', text: 'Duplicate id' }]);
+    const ids = fixed.map((o) => o.id);
+    expect(new Set(ids).size).toBe(5);
+    expect(fixed[3]).toEqual({ id: 'x', text: 'Kept' });
+    expect(fixed[4].text).toBe('Duplicate id');
+    expect(normaliseOptions(null)).toEqual([]);
   });
 });

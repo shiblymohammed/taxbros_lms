@@ -1,5 +1,5 @@
-import { AppShell } from '@/components/app-shell';
-import { STUDENT_NAV } from '@/lib/navigation';
+import { AppShell } from '@/components/layout/app-shell';
+import { STUDENT_NAV } from '@/config/navigation';
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
   return (

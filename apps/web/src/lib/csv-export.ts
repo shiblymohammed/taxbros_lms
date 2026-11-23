@@ -1,7 +1,7 @@
-export function exportToCSV(data: any[], filename: string) {
+/** Downloads the rows as CSV. Returns false (and does nothing) when there are no rows. */
+export function exportToCSV(data: any[], filename: string): boolean {
   if (!data || data.length === 0) {
-    alert('No data to export');
-    return;
+    return false;
   }
 
   // Get headers from the first object
@@ -41,4 +41,5 @@ export function exportToCSV(data: any[], filename: string) {
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  return true;
 }

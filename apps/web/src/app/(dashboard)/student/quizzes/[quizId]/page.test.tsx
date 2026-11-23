@@ -501,7 +501,7 @@ describe('QuizTakingPage', () => {
 
       await waitFor(() => {
         // Check that progress bar element exists
-        const progressBar = document.querySelector('.bg-blue-600');
+        const progressBar = document.querySelector('.bg-brand');
         expect(progressBar).toBeInTheDocument();
       });
     });

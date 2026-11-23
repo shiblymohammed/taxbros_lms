@@ -1,5 +1,5 @@
-import { AppShell } from '@/components/app-shell';
-import { ADMIN_NAV } from '@/lib/navigation';
+import { AppShell } from '@/components/layout/app-shell';
+import { ADMIN_NAV } from '@/config/navigation';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   return (

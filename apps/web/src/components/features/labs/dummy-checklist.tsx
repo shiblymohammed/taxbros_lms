@@ -36,7 +36,7 @@ export function DummyChecklist({ items, checked, onChange, error }: DummyCheckli
                 <input
                   id={id}
                   type="checkbox"
-                  className="h-5 w-5 shrink-0 accent-blue-600"
+                  className="h-5 w-5 shrink-0 accent-brand"
                   checked={!!checked[item]}
                   onChange={(e) => onChange(item, e.target.checked)}
                 />

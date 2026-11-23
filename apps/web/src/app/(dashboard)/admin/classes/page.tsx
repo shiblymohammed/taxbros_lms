@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { StudentPicker } from '@/components/admin/student-picker';
+import { StudentPicker } from '@/components/features/admin/student-picker';
 import { useToast } from '@/hooks/use-toast';
 import { classesAdminApi, type ClassDetail, type ClassSummary } from '@/lib/admin-api';
 import { getApiErrorMessage } from '@/lib/lab-validation';

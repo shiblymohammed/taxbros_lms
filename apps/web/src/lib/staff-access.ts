@@ -1,4 +1,4 @@
-import type { NavItem } from '@/components/app-shell';
+import type { NavItem } from '@/types/navigation';
 import type { SessionUser } from './auth';
 
 /**
@@ -25,13 +25,13 @@ interface StaffArea {
 }
 
 export const STAFF_AREAS: StaffArea[] = [
-  { prefix: '/admin/users', nav: { href: '/admin/users', label: 'Users' }, anyOf: ['MANAGE_STUDENTS', 'MANAGE_STAFF'] },
+  { prefix: '/admin/users', nav: { href: '/admin/users', label: 'Users', icon: 'users', group: 'People' }, anyOf: ['MANAGE_STUDENTS', 'MANAGE_STAFF'] },
   { prefix: '/admin/students', anyOf: ['MANAGE_STUDENTS'] },
-  { prefix: '/admin/classes', nav: { href: '/admin/classes', label: 'Classes' }, anyOf: ['MANAGE_CLASSES'] },
-  { prefix: '/admin/courses', nav: { href: '/admin/courses', label: 'Courses' }, anyOf: ['MANAGE_COURSES'] },
-  { prefix: '/admin/quizzes', nav: { href: '/admin/quizzes', label: 'Quizzes' }, anyOf: ['MANAGE_COURSES'] },
-  { prefix: '/admin/labs', nav: { href: '/admin/labs', label: 'Labs' }, anyOf: ['MANAGE_LABS'] },
-  { prefix: '/admin/reports', nav: { href: '/admin/reports/attendance', label: 'Reports' }, anyOf: ['VIEW_REPORTS'] },
+  { prefix: '/admin/classes', nav: { href: '/admin/classes', label: 'Classes', icon: 'classes', group: 'People' }, anyOf: ['MANAGE_CLASSES'] },
+  { prefix: '/admin/courses', nav: { href: '/admin/courses', label: 'Courses', icon: 'courses', group: 'Learning' }, anyOf: ['MANAGE_COURSES'] },
+  { prefix: '/admin/quizzes', nav: { href: '/admin/quizzes', label: 'Quizzes', icon: 'quizzes', group: 'Learning' }, anyOf: ['MANAGE_COURSES'] },
+  { prefix: '/admin/labs', nav: { href: '/admin/labs', label: 'Labs', icon: 'labs', group: 'Learning' }, anyOf: ['MANAGE_LABS'] },
+  { prefix: '/admin/reports', nav: { href: '/admin/reports/attendance', label: 'Reports', icon: 'reports', group: 'Attendance' }, anyOf: ['VIEW_REPORTS'] },
 ];
 
 const matches = (path: string, prefix: string) => path === prefix || path.startsWith(`${prefix}/`);
@@ -51,7 +51,7 @@ export function staffCanOpen(path: string, permissions: string[] | undefined): b
 export function staffNav(permissions: string[] | undefined): NavItem[] {
   const held = permissions ?? [];
   return [
-    { href: '/staff/attendance', label: 'Class Register' },
+    { href: '/staff/attendance', label: 'Class Register', icon: 'register', group: 'Attendance' },
     ...STAFF_AREAS.filter((a) => a.nav && a.anyOf.some((p) => held.includes(p))).map((a) => a.nav!),
   ];
 }

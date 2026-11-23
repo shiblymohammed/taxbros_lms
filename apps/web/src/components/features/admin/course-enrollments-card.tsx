@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2, UserMinus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { StudentPicker } from '@/components/admin/student-picker';
+import { StudentPicker } from '@/components/features/admin/student-picker';
 import { useToast } from '@/hooks/use-toast';
 import { courseEnrollmentsApi, type CourseEnrollmentRow } from '@/lib/admin-api';
 import { getApiErrorMessage } from '@/lib/lab-validation';

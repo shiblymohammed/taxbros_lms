@@ -41,7 +41,7 @@ export function StatusPicker({ label, value, onChange, disabled }: StatusPickerP
             aria-label={opt.label}
             disabled={disabled}
             onClick={() => onChange(opt.value)}
-            className={`h-11 min-w-11 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 disabled:opacity-50 ${
+            className={`h-11 min-w-11 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand disabled:opacity-50 ${
               selected ? opt.active : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
             }`}
           >
@@ -74,7 +74,7 @@ export function RemarksInput({
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
       placeholder="Optional remarks"
-      className="h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:opacity-50"
+      className="h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm focus:outline-none focus:ring-2 focus:ring-brand disabled:opacity-50"
     />
   );
 }

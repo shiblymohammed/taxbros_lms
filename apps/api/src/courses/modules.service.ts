@@ -1,6 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateModuleDto } from './dto/create-module.dto';
+import { assertNoQuizAttempts, deleteAttachedQuizzes } from './attached-quizzes';
+import { recalculateCourseProgress } from './course-progress';
 import { UpdateModuleDto } from './dto/update-module.dto';
 
 /**
@@ -172,15 +174,22 @@ export class ModulesService {
       throw new NotFoundException(`Module with ID ${id} not found`);
     }
 
-    // Delete module (cascade to lessons)
-    const module = await this.prisma.courseModule.delete({
-      where: { id },
+    const ids = { moduleIds: [id], lessonIds: existingModule.lessons.map((l) => l.id) };
+    await assertNoQuizAttempts(this.prisma, ids, 'module');
+
+    // Delete the module's quizzes, then the module (lessons cascade)
+    const { deletedModule, deletedQuizzes } = await this.prisma.$transaction(async (tx) => {
+      const count = await deleteAttachedQuizzes(tx, ids);
+      const removed = await tx.courseModule.delete({ where: { id } });
+      return { deletedModule: removed, deletedQuizzes: count };
     });
+    await recalculateCourseProgress(this.prisma, existingModule.courseId);
 
     return {
       message: `Module "${existingModule.title}" deleted successfully`,
-      deletedModule: module,
+      deletedModule,
       deletedLessonsCount: existingModule.lessons.length,
+      deletedQuizzes,
     };
   }
 }

@@ -1,7 +1,6 @@
 'use client';
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react';
-import Image from 'next/image';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Loader2, LogIn } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -85,9 +84,8 @@ function LoginForm() {
   };
 
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="h-fit w-full max-w-sm rounded-2xl shadow-lg sm:p-2 lg:shadow-sm">
       <CardHeader className="items-center text-center">
-        <Image src="/logo.webp" alt="TAXBROS" width={64} height={58} priority className="mb-2 h-14 w-auto" />
         <CardTitle className="text-2xl">Sign in</CardTitle>
         <CardDescription>TAXBROS Learning Management System</CardDescription>
       </CardHeader>
@@ -150,10 +148,8 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-10">
-      <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-gray-400" />}>
-        <LoginForm />
-      </Suspense>
-    </div>
+    <Suspense fallback={<Loader2 className="h-8 w-8 animate-spin text-gray-400" />}>
+      <LoginForm />
+    </Suspense>
   );
 }

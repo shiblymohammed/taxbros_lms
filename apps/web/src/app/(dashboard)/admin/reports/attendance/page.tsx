@@ -92,10 +92,7 @@ export default function MonthlyReportsPage() {
   }, [fetchReport]);
 
   const handleExportToCSV = () => {
-    if (reportData.length === 0) {
-      alert('No data to export');
-      return;
-    }
+    if (reportData.length === 0) return; // the button is disabled when there is nothing to export
 
     const exportData = reportData.map(row => ({
       'Student Name': row.studentName,

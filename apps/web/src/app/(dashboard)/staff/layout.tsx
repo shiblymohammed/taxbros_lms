@@ -1,5 +1,5 @@
-import { AppShell } from '@/components/app-shell';
-import { ADMIN_NAV, STAFF_NAV } from '@/lib/navigation';
+import { AppShell } from '@/components/layout/app-shell';
+import { ADMIN_NAV, STAFF_NAV } from '@/config/navigation';
 
 // Administrators also mark registers here, so they keep their own navigation
 export default function StaffLayout({ children }: { children: React.ReactNode }) {

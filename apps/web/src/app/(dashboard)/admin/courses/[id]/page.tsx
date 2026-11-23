@@ -5,13 +5,14 @@ import { useRouter, useParams } from 'next/navigation';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CourseEnrollmentsCard } from '@/components/admin/course-enrollments-card';
+import { CourseEnrollmentsCard } from '@/components/features/admin/course-enrollments-card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { coursesApi, modulesApi, lessonsApi, CourseWithModules, Module, Lesson } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export default function CourseEditorPage() {
   const router = useRouter();
@@ -28,6 +29,8 @@ export default function CourseEditorPage() {
   const [editedTitle, setEditedTitle] = useState('');
   const [editedDescription, setEditedDescription] = useState('');
   const [coverImageFile, setCoverImageFile] = useState<File | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<{ kind: 'module' | 'lesson'; id: string; title: string } | null>(null);
+  const [deletingItem, setDeletingItem] = useState(false);
   const [coverImagePreview, setCoverImagePreview] = useState<string | null>(null);
 
   // Module/Lesson modals
@@ -211,21 +214,25 @@ export default function CourseEditorPage() {
     }
   };
 
-  const handleDeleteModule = async (moduleId: string) => {
-    if (!confirm('Are you sure you want to delete this module? All lessons will be deleted.')) {
-      return;
-    }
-
+  // Deletes are confirmed in an in-app dialog (window.confirm is blocked in some browsers and webviews)
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+    const { kind, id } = pendingDelete;
+    setDeletingItem(true);
     try {
-      await modulesApi.deleteModule(moduleId);
-      toast({ title: 'Success', description: 'Module deleted' });
+      if (kind === 'module') await modulesApi.deleteModule(id);
+      else await lessonsApi.deleteLesson(id);
+      toast({ title: kind === 'module' ? 'Module deleted' : 'Lesson deleted' });
+      setPendingDelete(null);
       fetchCourse();
     } catch (err: any) {
       toast({
-        title: 'Error',
-        description: err.response?.data?.message || 'Failed to delete module',
+        title: kind === 'module' ? 'Module not deleted' : 'Lesson not deleted',
+        description: err.response?.data?.message || `Failed to delete ${kind}`,
         variant: 'destructive',
       });
+    } finally {
+      setDeletingItem(false);
     }
   };
 
@@ -317,24 +324,6 @@ export default function CourseEditorPage() {
     }
   };
 
-  const handleDeleteLesson = async (lessonId: string) => {
-    if (!confirm('Are you sure you want to delete this lesson?')) {
-      return;
-    }
-
-    try {
-      await lessonsApi.deleteLesson(lessonId);
-      toast({ title: 'Success', description: 'Lesson deleted' });
-      fetchCourse();
-    } catch (err: any) {
-      toast({
-        title: 'Error',
-        description: err.response?.data?.message || 'Failed to delete lesson',
-        variant: 'destructive',
-      });
-    }
-  };
-
   const openEditModule = (module: Module) => {
     setEditingModule(module);
     setModuleForm({
@@ -378,7 +367,7 @@ export default function CourseEditorPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6 flex justify-between items-start">
@@ -472,7 +461,7 @@ export default function CourseEditorPage() {
                 <div className="flex gap-3">
                   <Button
                     onClick={handleSaveCourse}
-                    className="bg-blue-600 hover:bg-blue-700"
+                   
                     disabled={isSaving}
                   >
                     {isSaving ? 'Saving...' : 'Save Changes'}
@@ -529,12 +518,12 @@ export default function CourseEditorPage() {
                             setSelectedModuleId(module.id);
                             setIsAddLessonOpen(true);
                           }}
-                          className="text-sm bg-blue-600 hover:bg-blue-700"
+                          className="text-sm"
                         >
                           + Lesson
                         </Button>
                         <Button
-                          onClick={() => handleDeleteModule(module.id)}
+                          onClick={() => setPendingDelete({ kind: 'module', id: module.id, title: module.title })}
                           variant="outline"
                           className="text-sm text-red-600 hover:text-red-700"
                         >
@@ -592,7 +581,7 @@ export default function CourseEditorPage() {
                                   {lesson.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
                                 </Button>
                                 <Button
-                                  onClick={() => handleDeleteLesson(lesson.id)}
+                                  onClick={() => setPendingDelete({ kind: 'lesson', id: lesson.id, title: lesson.title })}
                                   variant="outline"
                                   className="text-xs text-red-600 hover:text-red-700"
                                 >
@@ -616,6 +605,23 @@ export default function CourseEditorPage() {
         </Card>
 
         <CourseEnrollmentsCard courseId={courseId} published={course.status === 'PUBLISHED'} />
+
+        <ConfirmDialog
+          open={!!pendingDelete}
+          title={pendingDelete?.kind === 'module' ? 'Delete module?' : 'Delete lesson?'}
+          description={
+            pendingDelete
+              ? pendingDelete.kind === 'module'
+                ? `"${pendingDelete.title}" and all its lessons and quizzes will be deleted, with any student progress on them.`
+                : `"${pendingDelete.title}" and its quizzes will be deleted, with any student progress on it.`
+              : ''
+          }
+          confirmLabel="Delete"
+          destructive
+          busy={deletingItem}
+          onConfirm={confirmDelete}
+          onCancel={() => setPendingDelete(null)}
+        />
 
         {/* Add Module Modal */}
         {isAddModuleOpen && (
@@ -710,7 +716,7 @@ export default function CourseEditorPage() {
                 </Button>
                 <Button
                   onClick={handleUpdateModule}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1"
                 >
                   Update Module
                 </Button>
@@ -783,7 +789,7 @@ export default function CourseEditorPage() {
                 </Button>
                 <Button
                   onClick={handleAddLesson}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1"
                 >
                   Add Lesson
                 </Button>
@@ -855,7 +861,7 @@ export default function CourseEditorPage() {
                 </Button>
                 <Button
                   onClick={handleUpdateLesson}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700"
+                  className="flex-1"
                 >
                   Update Lesson
                 </Button>

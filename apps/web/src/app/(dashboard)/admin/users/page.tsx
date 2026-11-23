@@ -15,9 +15,9 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { CredentialsDialog } from '@/components/admin/credentials-dialog';
-import { PermissionsDialog } from '@/components/admin/permissions-dialog';
-import { UserFormDialog } from '@/components/admin/user-form-dialog';
+import { CredentialsDialog } from '@/components/features/admin/credentials-dialog';
+import { PermissionsDialog } from '@/components/features/admin/permissions-dialog';
+import { UserFormDialog } from '@/components/features/admin/user-form-dialog';
 import { useToast } from '@/hooks/use-toast';
 import { displayName, usersApi, type AdminUser, type StaffCategory, type UserFilters, type UserStatus } from '@/lib/admin-api';
 import { classesApi, type Class } from '@/lib/api';
@@ -363,7 +363,7 @@ export default function UsersPage() {
                           {user.status.charAt(0) + user.status.slice(1).toLowerCase()}
                         </span>
                         {user.mustChangePassword && (
-                          <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs text-blue-700">Must change password</span>
+                          <span className="rounded-full bg-brand-soft/50 px-2 py-0.5 text-xs text-brand-strong">Must change password</span>
                         )}
                         {isSelf && <span className="text-xs text-gray-500">(you)</span>}
                       </p>

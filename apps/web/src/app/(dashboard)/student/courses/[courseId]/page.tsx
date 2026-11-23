@@ -120,7 +120,7 @@ export default function StudentCoursePage() {
       case 'COMPLETED':
         return <CheckCircle2 className="h-5 w-5 text-green-600" />;
       case 'IN_PROGRESS':
-        return <PlayCircle className="h-5 w-5 text-blue-600" />;
+        return <PlayCircle className="h-5 w-5 text-brand" />;
       case 'NOT_STARTED':
       default:
         return <Circle className="h-5 w-5 text-gray-400" />;
@@ -185,7 +185,7 @@ export default function StudentCoursePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div>
       <div className="max-w-7xl mx-auto p-6">
         {/* Back Button */}
         <Button
@@ -235,7 +235,7 @@ export default function StudentCoursePage() {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">
                     <div
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
+                      className="bg-brand h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${progress.progressPercentage}%` }}
                     />
                   </div>
@@ -269,10 +269,10 @@ export default function StudentCoursePage() {
                     {module.lessons.map((lesson, lessonIndex) => (
                       <div
                         key={lesson.lessonId}
-                        className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors cursor-pointer"
+                        className="flex items-center justify-between gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
                         onClick={() => handleLessonClick(lesson.lessonId)}
                       >
-                        <div className="flex items-center gap-4 flex-1">
+                        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
                           {/* Status Icon */}
                           <div className="flex-shrink-0">
                             {getStatusIcon(lesson.status)}
@@ -292,7 +292,7 @@ export default function StudentCoursePage() {
                                   lesson.status === 'COMPLETED'
                                     ? 'text-green-600'
                                     : lesson.status === 'IN_PROGRESS'
-                                    ? 'text-blue-600'
+                                    ? 'text-brand'
                                     : 'text-gray-500'
                                 }`}
                               >

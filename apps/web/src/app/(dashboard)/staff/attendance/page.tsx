@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { AttendanceLegend, RemarksInput, StatusPicker, sameEntry } from "@/components/attendance/status-picker"
+import { AttendanceLegend, RemarksInput, StatusPicker, sameEntry } from "@/components/features/attendance/status-picker"
 import { changedMarks, entriesFromRegister, type EntryMap } from "@/lib/attendance-register"
 import {
   AttendanceStatus,
@@ -204,7 +204,7 @@ export default function ClassRegisterPage() {
                   value={date}
                   max={today}
                   onChange={(e) => e.target.value && setDate(e.target.value)}
-                  className="h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 md:w-auto md:text-sm"
+                  className="h-11 w-full rounded-md border border-gray-300 bg-white px-3 text-base focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand md:w-auto md:text-sm"
                 />
               </div>
             </div>
@@ -214,7 +214,7 @@ export default function ClassRegisterPage() {
                 <p className="text-sm text-gray-600" aria-live="polite">
                   Marked {markedCount} / {students.length}
                   {unmarked > 0 && <span className="ml-1 font-medium text-amber-700">({unmarked} unmarked)</span>}
-                  {pending.length > 0 && <span className="ml-1 text-blue-700">· {pending.length} unsaved</span>}
+                  {pending.length > 0 && <span className="ml-1 text-brand-strong">· {pending.length} unsaved</span>}
                 </p>
                 <Button variant="outline" onClick={markRestPresent} disabled={loading || saving || unmarked === 0}>
                   Mark rest Present

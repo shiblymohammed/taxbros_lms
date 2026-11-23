@@ -14,6 +14,21 @@ const MAX_OPTIONS = 6;
 let nextOptionSeq = 0;
 const newOptionId = () => `opt-${Date.now().toString(36)}-${(nextOptionSeq++).toString(36)}`;
 
+/**
+ * Editable copies of saved options. Every option needs its own id (React key and the field it
+ * updates); options saved without one by an older API bug get a fresh id and keep their text.
+ */
+export function normaliseOptions(options: unknown): QuizOption[] {
+  if (!Array.isArray(options)) return [];
+  const seen = new Set<string>();
+  return options.map((raw) => {
+    const o = (raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {}) as Partial<QuizOption>;
+    const id = typeof o.id === 'string' && o.id && !seen.has(o.id) ? o.id : newOptionId();
+    seen.add(id);
+    return { id, text: typeof o.text === 'string' ? o.text : '' };
+  });
+}
+
 /** Validates a question (R24.1–R24.4): text, 2–6 non-empty unique options, one correct answer, marks ≥ 1. */
 export function validateQuestion(text: string, options: QuizOption[], correct: string, marks: string): string | null {
   if (!text.trim()) return 'Enter the question text.';
@@ -37,7 +52,7 @@ interface Props {
 export function QuestionEditor({ question, saving, onSave, onCancel }: Props) {
   const [text, setText] = useState(question?.questionText ?? '');
   const [options, setOptions] = useState<QuizOption[]>(
-    question?.options.map((o) => ({ ...o })) ?? [
+    question ? normaliseOptions(question.options) : [
       { id: newOptionId(), text: '' },
       { id: newOptionId(), text: '' },
       { id: newOptionId(), text: '' },

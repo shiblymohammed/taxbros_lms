@@ -1,4 +1,4 @@
-import { sameEntry, type AttendanceEntry } from '@/components/attendance/status-picker';
+import { sameEntry, type AttendanceEntry } from '@/components/features/attendance/status-picker';
 import type { AttendanceRegister, AttendanceStatus, RegisterMark } from './api';
 
 export type EntryMap = Record<string, AttendanceEntry>;

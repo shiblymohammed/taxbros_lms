@@ -8,26 +8,46 @@
  * dark setting made text near-white on white. Add a proper dark theme later if needed.
  */
 @theme {
-  --color-background: hsl(0 0% 100%);
-  --color-foreground: hsl(0 0% 3.9%);
-  --color-card: hsl(0 0% 100%);
-  --color-card-foreground: hsl(0 0% 3.9%);
-  --color-popover: hsl(0 0% 100%);
-  --color-popover-foreground: hsl(0 0% 3.9%);
-  --color-primary: hsl(0 0% 9%);
-  --color-primary-foreground: hsl(0 0% 98%);
-  --color-secondary: hsl(0 0% 96.1%);
-  --color-secondary-foreground: hsl(0 0% 9%);
-  --color-muted: hsl(0 0% 96.1%);
-  --color-muted-foreground: hsl(0 0% 45.1%);
-  --color-accent: hsl(0 0% 96.1%);
-  --color-accent-foreground: hsl(0 0% 9%);
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(0 0% 98%);
-  --color-border: hsl(0 0% 89.8%);
-  --color-input: hsl(0 0% 89.8%);
-  --color-ring: hsl(0 0% 3.9%);
-  --radius: 0.5rem;
+  /* TAXBROS design system (Mobile App UI · LMS): teal palette, Inter body, Manrope headings */
+  --color-background: #ffffff;
+  /* Page canvas behind cards in signed-in areas */
+  --color-canvas: #eef2f4;
+  --color-surface: #f6f7f8;
+  --color-foreground: #0f172a;
+  --color-card: #ffffff;
+  --color-card-foreground: #0f172a;
+  --color-popover: #ffffff;
+  --color-popover-foreground: #0f172a;
+  /* Primary actions: deep teal */
+  --color-primary: #0f4c5c;
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eef2f4;
+  --color-secondary-foreground: #0f4c5c;
+  --color-muted: #f1f5f9;
+  --color-muted-foreground: #64748b;
+  --color-accent: #d6f0f2;
+  --color-accent-foreground: #0f4c5c;
+  --color-destructive: #dc2626;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #e2e8ec;
+  --color-input: #d5dde2;
+  --color-ring: #1f7a8c;
+  /* Brand teal: accents, active states, progress */
+  --color-brand: #1f7a8c;
+  --color-brand-strong: #0f4c5c;
+  --color-brand-soft: #d6f0f2;
+  /* Logo orange, used sparingly for highlights */
+  --color-flame: #f28c28;
+  /* Navigation sidebar (dark teal) */
+  --color-sidebar: #0b3b47;
+  --color-sidebar-foreground: #b8d2d8;
+  --color-sidebar-muted: #7ea6ae;
+  --color-sidebar-accent: #145566;
+  --color-sidebar-border: #164f5d;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-manrope), var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --radius: 0.75rem;
 }
 
 :root {
@@ -38,8 +58,22 @@
   border-color: var(--color-border);
 }
 
+h1,
+h2,
+h3 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
+}
+
 body {
+  font-family: var(--font-sans);
   background-color: var(--color-background);
   color: var(--color-foreground);
   font-feature-settings: "rlig" 1, "calt" 1;
+}
+
+/* Thin, unobtrusive scrollbar for the sidebar menu */
+.sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: #1d5f6f transparent;
 }

@@ -17,9 +17,9 @@ import {
   validateFictionalDin,
 } from '@/lib/lab-validation';
 import { useToast } from '@/hooks/use-toast';
-import { SimulationWarning } from '@/components/labs/simulation-warning';
-import { FormField } from '@/components/labs/form-field';
-import { DummyChecklist, allChecked } from '@/components/labs/dummy-checklist';
+import { SimulationWarning } from '@/components/features/labs/simulation-warning';
+import { FormField } from '@/components/features/labs/form-field';
+import { DummyChecklist, allChecked } from '@/components/features/labs/dummy-checklist';
 
 /**
  * MCA company incorporation lab (Task 56, Requirement R30)
@@ -249,7 +249,7 @@ export default function McaIncorporationLabPage() {
   const errorCount = Object.keys(errors).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
+    <div className="py-6 sm:py-8">
       <div className="max-w-4xl mx-auto px-4">
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
@@ -486,10 +486,10 @@ export default function McaIncorporationLabPage() {
           </form>
         )}
 
-        <Card className="mt-6 bg-blue-50 border-blue-200">
+        <Card className="mt-6 bg-brand-soft/50 border-brand-soft">
           <CardContent className="pt-6">
-            <h3 className="font-semibold text-blue-900 mb-2">About this Lab</h3>
-            <ul className="text-sm text-blue-800 space-y-1 list-disc list-inside">
+            <h3 className="font-semibold text-brand-strong mb-2">About this Lab</h3>
+            <ul className="text-sm text-brand-strong space-y-1 list-disc list-inside">
               <li>Practise the information an incorporation application asks for</li>
               <li>CINs and registration numbers are randomly generated and fictional</li>
               <li>No data from this simulation is sent to the Ministry of Corporate Affairs</li>

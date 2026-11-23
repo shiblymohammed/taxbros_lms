@@ -11,6 +11,7 @@ import { QueryCourseDto } from './dto/query-course.dto';
 import { EnrollStudentDto } from './dto/enroll-student.dto';
 import { QueryEnrollmentDto } from './dto/query-enrollment.dto';
 import { CourseStatus, CourseEnrollmentStatus, Prisma, UserRole } from '@prisma/client';
+import { deleteAttachedQuizzes } from './attached-quizzes';
 
 /**
  * Courses Service
@@ -229,18 +230,44 @@ export class CoursesService {
   async remove(id: string) {
     const existingCourse = await this.prisma.course.findUnique({
       where: { id },
+      include: {
+        _count: { select: { enrollments: true } },
+        modules: { select: { id: true, lessons: { select: { id: true } } } },
+      },
     });
 
     if (!existingCourse) {
       throw new NotFoundException(`Course with ID "${id}" not found`);
     }
 
-    return await this.prisma.course.update({
-      where: { id },
-      data: {
-        status: CourseStatus.ARCHIVED,
-      },
+    // Students have been enrolled (even if since removed): keep their history and archive instead
+    if (existingCourse._count.enrollments > 0) {
+      const course = await this.prisma.course.update({
+        where: { id },
+        data: { status: CourseStatus.ARCHIVED },
+      });
+      return {
+        action: 'archived' as const,
+        message: `"${course.title}" has enrolment history, so it was archived instead of deleted. Students no longer see it.`,
+        course,
+      };
+    }
+
+    // Never used by students (e.g. created by mistake): delete it with its modules, lessons and quizzes
+    const moduleIds = existingCourse.modules.map((m) => m.id);
+    const lessonIds = existingCourse.modules.flatMap((m) => m.lessons.map((l) => l.id));
+    const deletedQuizzes = await this.prisma.$transaction(async (tx) => {
+      const count = await deleteAttachedQuizzes(tx, { courseIds: [id], moduleIds, lessonIds });
+      await tx.course.delete({ where: { id } }); // modules and lessons cascade
+      return count;
     });
+    return {
+      action: 'deleted' as const,
+      message: `"${existingCourse.title}" was deleted.`,
+      deletedModules: moduleIds.length,
+      deletedLessons: lessonIds.length,
+      deletedQuizzes,
+    };
   }
 
   /**

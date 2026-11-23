@@ -132,7 +132,7 @@ export default function StudentProfilePage() {
                 {student.courseEnrollments.map((e) => (
                   <li key={e.id}>
                     <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2 text-sm">
-                      <Link href={`/admin/courses/${e.course.id}`} className="font-medium text-blue-700 hover:underline">
+                      <Link href={`/admin/courses/${e.course.id}`} className="font-medium text-brand-strong hover:underline">
                         {e.course.title}
                       </Link>
                       <span className="text-gray-500">
@@ -147,7 +147,7 @@ export default function StudentProfilePage() {
                       aria-valuemin={0}
                       aria-valuemax={100}
                     >
-                      <div className="h-full rounded-full bg-blue-600" style={{ width: `${e.progressPercentage}%` }} />
+                      <div className="h-full rounded-full bg-brand" style={{ width: `${e.progressPercentage}%` }} />
                     </div>
                   </li>
                 ))}

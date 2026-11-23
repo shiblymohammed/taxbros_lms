@@ -19,7 +19,7 @@ import {
   emptyQuizSettings,
   toQuizPayload,
   type QuizSettings,
-} from '@/components/admin/quiz-settings-form';
+} from '@/components/features/admin/quiz-settings-form';
 import { useToast } from '@/hooks/use-toast';
 import { marksSummary, quizAdminApi, type AdminQuiz } from '@/lib/admin-api';
 import { getApiErrorMessage } from '@/lib/lab-validation';

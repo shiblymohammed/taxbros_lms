@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
  */
 
 const LAB_META: Record<LabType, { icon: typeof Building2; color: string; route: string }> = {
-  GST_REGISTRATION: { icon: Building2, color: 'text-blue-600 bg-blue-50', route: '/student/labs/gst' },
+  GST_REGISTRATION: { icon: Building2, color: 'text-brand bg-brand-soft/50', route: '/student/labs/gst' },
   INCOME_TAX_RETURN: { icon: Receipt, color: 'text-green-600 bg-green-50', route: '/student/labs/itr' },
   MCA_INCORPORATION: { icon: ScrollText, color: 'text-purple-600 bg-purple-50', route: '/student/labs/mca' },
 };
@@ -131,7 +131,7 @@ export default function AdminLabsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6 sm:py-8">
+    <div className="py-6 sm:py-8">
       <div className="max-w-6xl mx-auto px-4">
         <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>

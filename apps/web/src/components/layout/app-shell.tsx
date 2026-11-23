@@ -1,27 +1,19 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { KeyRound, Loader2, LogOut, Menu, X } from 'lucide-react';
-import {
-  getAccessToken,
-  getStoredUser,
-  homePathForRole,
-  loginRedirectUrl,
-  logout,
-  refreshAccessToken,
-  type SessionUser,
-  type UserRole,
-} from '@/lib/auth';
-import { apiClient } from '@/lib/api';
-import { staffCanOpen, staffNav } from '@/lib/staff-access';
+import * as SheetPrimitive from '@radix-ui/react-dialog';
+import { Loader2, X } from 'lucide-react';
+import { logout, type UserRole } from '@/lib/auth';
+import { staffNav } from '@/lib/staff-access';
+import { cn } from '@/lib/utils';
+import { useSessionGuard } from '@/hooks/use-session-guard';
+import type { NavItem } from '@/types/navigation';
+import { BottomNav } from './bottom-nav';
+import { Sidebar } from './sidebar';
+import { Topbar } from './topbar';
 
-export interface NavItem {
-  href: string;
-  label: string;
-}
+export type { NavItem };
 
 interface AppShellProps {
   roleLabel: string;
@@ -35,61 +27,33 @@ interface AppShellProps {
   children: ReactNode;
 }
 
+const COLLAPSED_KEY = 'sidebarCollapsed';
+
 /**
- * Responsive application shell (Task 58, Requirement R34).
- * Horizontal navigation from md up; collapses into a toggle menu on phones.
+ * Application shell for signed-in areas (R34, design.md: RoleLayout).
+ * Fixed sidebar from lg up (collapsible to icons); a slide-in drawer on phones and tablets.
  */
 export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, staffByPermission, children }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [open, setOpen] = useState(false);
-  const [user, setUser] = useState<SessionUser | null>(null);
+  const user = useSessionGuard({ roles, staffByPermission });
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
-  const rolesKey = roles.join(',');
+  const [collapsed, setCollapsed] = useState(
+    () => typeof window !== 'undefined' && window.localStorage?.getItem(COLLAPSED_KEY) === '1',
+  );
 
-  // Route guard: only render the area for a signed-in user with an allowed role.
-  // The API still enforces roles on every request; this keeps people out of screens they can't use.
+  // Close the drawer after navigating
   useEffect(() => {
-    let cancelled = false;
-    const check = async () => {
-      let current = getAccessToken() ? getStoredUser() : null;
-      if (!current) {
-        // Access token missing: the refresh cookie may still be valid
-        current = (await refreshAccessToken()) ? getStoredUser() : null;
-      }
-      if (cancelled) return;
-      if (!current) {
-        router.replace(loginRedirectUrl(pathname));
-        return;
-      }
-      if (current.mustChangePassword) {
-        router.replace(`/change-password?next=${encodeURIComponent(pathname)}`);
-        return;
-      }
-      if (!rolesKey.split(',').includes(current.role)) {
-        router.replace(homePathForRole(current.role));
-        return;
-      }
-      if (current.role === 'STAFF') {
-        // Read permissions fresh each time an area opens, so a revoked one disappears at once (R3.5)
-        try {
-          const { data } = await apiClient.get<{ permissions?: string[] }>('/auth/me');
-          current = { ...current, permissions: data.permissions ?? [] };
-          localStorage.setItem('authUser', JSON.stringify(current));
-        } catch {
-          // Keep the stored permissions; the API still checks every request
-        }
-        if (cancelled) return;
-      }
-      setUser(current);
-    };
-    check();
-    return () => {
-      cancelled = true;
-    };
-    // Re-check only when the allowed roles change; pathname changes stay inside the same area
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rolesKey, router]);
+    setDrawerOpen(false);
+  }, [pathname]);
+
+  const toggleCollapsed = () => {
+    setCollapsed((v) => {
+      localStorage.setItem(COLLAPSED_KEY, v ? '0' : '1');
+      return !v;
+    });
+  };
 
   const onSignOut = async () => {
     setSigningOut(true);
@@ -97,23 +61,10 @@ export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, 
     router.replace('/login');
   };
 
-  // Close the mobile menu after navigating
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
-  const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
-
-  // Staff in the admin area: only screens their permissions open (re-checked on every navigation)
-  const staffBlocked = !!user && user.role === 'STAFF' && !!staffByPermission && !staffCanOpen(pathname, user.permissions);
-  useEffect(() => {
-    if (staffBlocked) router.replace(homePathForRole('STAFF'));
-  }, [staffBlocked, router]);
-
-  if (!user || staffBlocked) {
+  if (!user) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-50" aria-busy="true">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex min-h-screen items-center justify-center bg-canvas" aria-busy="true">
+        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
         <span className="sr-only">Checking your session…</span>
       </div>
     );
@@ -123,122 +74,71 @@ export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, 
   const isStaff = user.role === 'STAFF';
   const nav = isStaff ? staffNav(user.permissions) : isAdmin && adminNav ? adminNav : areaNav;
   const roleLabel = isStaff ? 'Staff' : isAdmin && adminNav ? 'Administrator' : areaLabel;
-  // Long menus (admin) collapse until there's room for all items
-  const wide = nav.length > 5;
-
-  const signOutButton = (className: string) => (
-    <button
-      type="button"
-      onClick={onSignOut}
-      disabled={signingOut}
-      className={className}
-    >
-      {signingOut ? <Loader2 className="h-4 w-4 animate-spin" /> : <LogOut className="h-4 w-4" />}
-      Sign out
-    </button>
-  );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen w-full bg-canvas">
       <a
         href="#main-content"
-        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-50 focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-2 focus:top-2 focus:z-[60] focus:rounded focus:bg-white focus:px-3 focus:py-2 focus:shadow"
       >
         Skip to content
       </a>
-      <header className="sticky top-0 z-40 border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
-        <div className="mx-auto flex h-14 max-w-7xl items-center gap-4 px-4">
-          <Link href={nav[0]?.href ?? '/'} className="flex min-h-11 items-center gap-2 shrink-0">
-            <Image src="/logo.webp" alt="" width={32} height={29} priority className="h-8 w-auto" />
-            <span className="font-bold text-gray-900">TAXBROS</span>
-            <span className="hidden rounded bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600 sm:inline">
-              {roleLabel}
-            </span>
-          </Link>
 
-          <nav aria-label="Main" className={`ml-auto hidden ${wide ? 'xl:block' : 'md:block'}`}>
-            <ul className={`flex items-center ${wide ? 'gap-0.5' : 'gap-1'}`}>
-              {nav.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                    className={`inline-flex h-9 items-center whitespace-nowrap rounded-md text-sm font-medium transition-colors ${wide ? 'px-2.5' : 'px-3'} ${
-                      isActive(item.href)
-                        ? 'bg-gray-900 text-white'
-                        : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </nav>
-
-          <div className={`hidden items-center gap-2 border-l pl-3 ${wide ? 'xl:flex' : 'md:flex'}`}>
-            <span className={`max-w-[12rem] truncate text-sm text-gray-600 ${wide ? 'hidden 2xl:inline' : ''}`} title={user.email}>
-              {user.email}
-            </span>
-            <Link
-              href="/change-password"
-              className="inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-gray-700 hover:bg-gray-100"
-            >
-              <KeyRound className="h-4 w-4" />
-              <span className={wide ? 'hidden 2xl:inline' : 'hidden lg:inline'}>Change password</span>
-              <span className={wide ? 'sr-only 2xl:hidden' : 'sr-only lg:hidden'}>Change password</span>
-            </Link>
-            {signOutButton(
-              'inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-sm font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50',
-            )}
-          </div>
-
-          <button
-            type="button"
-            className={`ml-auto inline-flex h-11 w-11 items-center justify-center rounded-md text-gray-700 hover:bg-gray-100 ${wide ? 'xl:hidden' : 'md:hidden'}`}
-            aria-expanded={open}
-            aria-controls="mobile-nav"
-            aria-label={open ? 'Close menu' : 'Open menu'}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-          </button>
-        </div>
-
-        {open && (
-          <nav id="mobile-nav" aria-label="Main" className={`border-t bg-white ${wide ? 'xl:hidden' : 'md:hidden'}`}>
-            <ul className="mx-auto max-w-7xl space-y-1 px-4 py-2">
-              {nav.map((item) => (
-                <li key={item.href}>
-                  <Link
-                    href={item.href}
-                    aria-current={isActive(item.href) ? 'page' : undefined}
-                    className={`flex min-h-11 items-center rounded-md px-3 text-base font-medium ${
-                      isActive(item.href) ? 'bg-gray-900 text-white' : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    {item.label}
-                  </Link>
-                </li>
-              ))}
-              <li className="mt-1 border-t pt-2">
-                <p className="truncate px-3 pb-1 text-sm text-gray-500">{user.email}</p>
-                <Link
-                  href="/change-password"
-                  className="flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-base font-medium text-gray-700 hover:bg-gray-100"
-                >
-                  <KeyRound className="h-4 w-4" /> Change password
-                </Link>
-                {signOutButton(
-                  'flex min-h-11 w-full items-center gap-2 rounded-md px-3 text-base font-medium text-gray-700 hover:bg-gray-100 disabled:opacity-50',
-                )}
-              </li>
-            </ul>
-          </nav>
+      {/* Desktop sidebar */}
+      <aside
+        className={cn(
+          'fixed inset-y-0 left-0 z-40 hidden transition-[width] duration-200 lg:block',
+          collapsed ? 'w-[4.5rem]' : 'w-64',
         )}
-      </header>
+      >
+        <Sidebar
+          nav={nav}
+          pathname={pathname}
+          roleLabel={roleLabel}
+          collapsed={collapsed}
+          onToggleCollapsed={toggleCollapsed}
+        />
+      </aside>
 
-      <main id="main-content">{children}</main>
+      {/* Mobile and tablet drawer */}
+      <SheetPrimitive.Root open={drawerOpen} onOpenChange={setDrawerOpen}>
+        <SheetPrimitive.Portal>
+          <SheetPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-[1px] lg:hidden" />
+          <SheetPrimitive.Content
+            id="mobile-sidebar"
+            className="fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] shadow-2xl focus:outline-none lg:hidden"
+          >
+            <SheetPrimitive.Title className="sr-only">Menu</SheetPrimitive.Title>
+            <SheetPrimitive.Description className="sr-only">Main navigation</SheetPrimitive.Description>
+            <Sidebar nav={nav} pathname={pathname} roleLabel={roleLabel} onNavigate={() => setDrawerOpen(false)} />
+            <SheetPrimitive.Close
+              aria-label="Close menu"
+              className="absolute right-3 top-3.5 inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/60"
+            >
+              <X className="h-5 w-5" />
+            </SheetPrimitive.Close>
+          </SheetPrimitive.Content>
+        </SheetPrimitive.Portal>
+      </SheetPrimitive.Root>
+
+      <div className={cn('flex min-h-screen flex-col transition-[padding] duration-200', collapsed ? 'lg:pl-[4.5rem]' : 'lg:pl-64')}>
+        <Topbar
+          nav={nav}
+          pathname={pathname}
+          user={user}
+          signingOut={signingOut}
+          onSignOut={onSignOut}
+        />
+        {/* Room for the phone tab bar */}
+        <main id="main-content" className="flex-1 pb-24 lg:pb-0">
+          {children}
+        </main>
+        <footer className="hidden border-t bg-white/60 px-4 py-4 text-xs text-slate-500 sm:px-6 lg:block lg:px-8">
+          © {new Date().getFullYear()} TAXBROS Institute · Learning Management System
+        </footer>
+      </div>
+
+      <BottomNav nav={nav} pathname={pathname} onMore={() => setDrawerOpen(true)} />
     </div>
   );
 }

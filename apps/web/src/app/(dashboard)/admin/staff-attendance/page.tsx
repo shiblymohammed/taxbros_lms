@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { Calendar, Save, Loader2, Check } from "lucide-react"
-import { AttendanceLegend, RemarksInput, StatusPicker, sameEntry } from "@/components/attendance/status-picker"
+import { AttendanceLegend, RemarksInput, StatusPicker, sameEntry } from "@/components/features/attendance/status-picker"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/hooks/use-toast"
@@ -184,7 +184,7 @@ export default function StaffAttendancePage() {
                 value={selectedDate}
                 max={today}
                 onChange={(e) => setSelectedDate(e.target.value)}
-                className="h-11 w-full md:w-auto rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+                className="h-11 w-full md:w-auto rounded-md border border-gray-300 bg-white px-3 text-base md:text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               />
             </label>
 
@@ -192,7 +192,7 @@ export default function StaffAttendancePage() {
               <p className="text-sm text-gray-600" aria-live="polite">
                 Marked {markedCount} / {staffMembers.length}
                 {unmarked > 0 && <span className="ml-1 font-medium text-amber-700">({unmarked} unmarked)</span>}
-                {dirtyIds.length > 0 && <span className="ml-1 text-blue-700">· {dirtyIds.length} unsaved</span>}
+                {dirtyIds.length > 0 && <span className="ml-1 text-brand-strong">· {dirtyIds.length} unsaved</span>}
               </p>
               <Button variant="outline" onClick={markAllPresent} disabled={loading || unmarked === 0}>
                 Mark rest Present

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { AppShell } from './app-shell';
 import { apiClient } from '@/lib/api';
-import { ADMIN_NAV } from '@/lib/navigation';
+import { ADMIN_NAV } from '@/config/navigation';
 
 const replace = vi.fn();
 // Stable like the real Next router (the shell re-checks the session when it changes)

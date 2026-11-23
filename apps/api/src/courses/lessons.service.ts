@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
+import { assertNoQuizAttempts, deleteAttachedQuizzes } from './attached-quizzes';
+import { recalculateCourseProgress } from './course-progress';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
 
 /**
@@ -207,6 +209,11 @@ export class LessonsService {
       },
     });
 
+    // Publishing or unpublishing changes every enrolled student's course %
+    if (updateLessonDto.status && updateLessonDto.status !== existingLesson.status) {
+      await recalculateCourseProgress(this.prisma, lesson.module.courseId);
+    }
+
     return lesson;
   }
 
@@ -267,6 +274,7 @@ export class LessonsService {
     const existingLesson = await this.prisma.lesson.findUnique({
       where: { id },
       include: {
+        module: { select: { courseId: true } },
         lessonProgress: {
           select: {
             id: true,
@@ -283,15 +291,21 @@ export class LessonsService {
     // Warn if there's student progress
     const hasProgress = existingLesson.lessonProgress.length > 0;
 
-    // Delete lesson (cascade deletes progress records)
-    const lesson = await this.prisma.lesson.delete({
-      where: { id },
+    await assertNoQuizAttempts(this.prisma, { lessonIds: [id] }, 'lesson');
+
+    // Delete the lesson's quizzes, then the lesson (progress records cascade)
+    const { lesson, deletedQuizzes } = await this.prisma.$transaction(async (tx) => {
+      const count = await deleteAttachedQuizzes(tx, { lessonIds: [id] });
+      const removed = await tx.lesson.delete({ where: { id } });
+      return { lesson: removed, deletedQuizzes: count };
     });
+    await recalculateCourseProgress(this.prisma, existingLesson.module.courseId);
 
     return {
       message: `Lesson "${existingLesson.title}" deleted successfully`,
       deletedLesson: lesson,
       deletedProgressRecords: existingLesson.lessonProgress.length,
+      deletedQuizzes,
       warning: hasProgress
         ? `This lesson had ${existingLesson.lessonProgress.length} student progress record(s) which have been deleted.`
         : null,

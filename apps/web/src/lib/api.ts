@@ -414,8 +414,13 @@ export const coursesApi = {
     return response.data;
   },
 
-  async deleteCourse(courseId: string): Promise<void> {
-    await apiClient.delete(`/courses/${courseId}`);
+  /**
+   * Deletes a course nobody has been enrolled in (with its modules, lessons and quizzes);
+   * a course with enrolment history is archived instead. `action` says which happened.
+   */
+  async deleteCourse(courseId: string): Promise<{ action: 'deleted' | 'archived'; message: string }> {
+    const response = await apiClient.delete(`/courses/${courseId}`);
+    return response.data;
   },
 
   async publishCourse(courseId: string): Promise<Course> {

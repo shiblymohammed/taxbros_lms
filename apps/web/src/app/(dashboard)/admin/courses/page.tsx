@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Card } from '@/components/ui/card';
@@ -12,6 +12,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { coursesApi, Course } from '@/lib/api';
 import { useToast } from '@/components/ui/toast';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Trash2 } from 'lucide-react';
 
 export default function CoursesPage() {
   const router = useRouter();
@@ -21,6 +23,9 @@ export default function CoursesPage() {
   const [error, setError] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [toDelete, setToDelete] = useState<Course | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const [newCourse, setNewCourse] = useState({
     title: '',
     description: '',
@@ -109,6 +114,42 @@ export default function CoursesPage() {
     }
   };
 
+  // Archived courses are hidden unless asked for (a course with enrolments is archived when "deleted")
+  const archivedCount = useMemo(() => courses.filter((c) => c.status === 'ARCHIVED').length, [courses]);
+  const visibleCourses = useMemo(
+    () => (showArchived ? courses : courses.filter((c) => c.status !== 'ARCHIVED')),
+    [courses, showArchived],
+  );
+
+  const handleDelete = async () => {
+    if (!toDelete) return;
+    setDeleting(true);
+    try {
+      const result = await coursesApi.deleteCourse(toDelete.id);
+      toast({ title: result.action === 'deleted' ? 'Course deleted' : 'Course archived', description: result.message });
+      setToDelete(null);
+      fetchCourses();
+    } catch (err: any) {
+      toast({
+        title: 'Course not deleted',
+        description: err.response?.data?.message || 'Failed to delete course',
+        variant: 'destructive',
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleRestore = async (course: Course) => {
+    try {
+      await coursesApi.unpublishCourse(course.id); // back to draft
+      toast({ title: 'Course restored', description: `"${course.title}" is a draft again.` });
+      fetchCourses();
+    } catch (err: any) {
+      toast({ title: 'Not restored', description: err.response?.data?.message || 'Failed to restore course', variant: 'destructive' });
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PUBLISHED':
@@ -147,7 +188,7 @@ export default function CoursesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8 flex justify-between items-center">
@@ -155,25 +196,38 @@ export default function CoursesPage() {
             <h1 className="text-3xl font-bold text-gray-900">Course Management</h1>
             <p className="text-gray-600 mt-2">Create and manage courses, modules, and lessons</p>
           </div>
-          <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
-            + New Course
-          </Button>
+          <div className="flex items-center gap-3">
+            {archivedCount > 0 && (
+              <label className="flex items-center gap-2 text-sm text-gray-600">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={showArchived}
+                  onChange={(e) => setShowArchived(e.target.checked)}
+                />
+                Show archived ({archivedCount})
+              </label>
+            )}
+            <Button onClick={() => setIsCreateModalOpen(true)}>
+              + New Course
+            </Button>
+          </div>
         </div>
 
         {/* Courses Grid */}
-        {courses.length === 0 ? (
+        {visibleCourses.length === 0 ? (
           <Card className="p-12 text-center">
             <p className="text-gray-500 text-lg mb-4">No courses yet</p>
-            <Button onClick={() => setIsCreateModalOpen(true)} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={() => setIsCreateModalOpen(true)}>
               Create Your First Course
             </Button>
           </Card>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {courses.map((course) => (
+            {visibleCourses.map((course) => (
               <Card key={course.id} className="overflow-hidden hover:shadow-lg transition-shadow">
                 {/* Cover Image */}
-                <div className="h-48 bg-gradient-to-br from-blue-500 to-purple-600 relative">
+                <div className="h-48 bg-gradient-to-br from-brand-strong to-brand relative">
                   {course.coverImage && (
                     <Image
                       src={course.coverImage}
@@ -203,23 +257,56 @@ export default function CoursesPage() {
                   <div className="flex gap-2">
                     <Button
                       onClick={() => router.push(`/admin/courses/${course.id}`)}
-                      className="flex-1 bg-gray-900 hover:bg-gray-800"
+                      className="flex-1"
                     >
                       Edit
                     </Button>
-                    <Button
-                      onClick={() => handleTogglePublish(course)}
-                      variant="outline"
-                      className="flex-1"
-                    >
-                      {course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
-                    </Button>
+                    {course.status === 'ARCHIVED' ? (
+                      <Button onClick={() => handleRestore(course)} variant="outline" className="flex-1">
+                        Restore
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => handleTogglePublish(course)}
+                        variant="outline"
+                        className="flex-1"
+                      >
+                        {course.status === 'PUBLISHED' ? 'Unpublish' : 'Publish'}
+                      </Button>
+                    )}
+                    {course.status !== 'ARCHIVED' && (
+                      <Button
+                        onClick={() => setToDelete(course)}
+                        variant="outline"
+                        size="icon"
+                        className="text-red-700 hover:text-red-800"
+                        aria-label={`Delete ${course.title}`}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
                   </div>
                 </div>
               </Card>
             ))}
           </div>
         )}
+
+        <ConfirmDialog
+          open={!!toDelete}
+          title="Delete course?"
+          description={
+            toDelete
+              ? `"${toDelete.title}" will be deleted with all its modules, lessons and quizzes. ` +
+                'If students have ever been enrolled, it is archived instead so their history is kept.'
+              : ''
+          }
+          confirmLabel="Delete course"
+          destructive
+          busy={deleting}
+          onConfirm={handleDelete}
+          onCancel={() => setToDelete(null)}
+        />
 
         {/* Create Course Modal */}
         <Dialog open={isCreateModalOpen} onOpenChange={(open) => !isCreating && setIsCreateModalOpen(open)}>
