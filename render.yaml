@@ -5,12 +5,10 @@ services:
     region: oregon
     plan: free
     rootDir: .
-    buildCommand: NODE_ENV=development pnpm install --no-frozen-lockfile && pnpm --filter @taxbros/types build && pnpm --filter api prisma:generate && pnpm --filter api build
-    startCommand: pnpm --filter api start:prod
+    buildCommand: pnpm install --no-frozen-lockfile --prod=false && pnpm --filter @taxbros/types build && pnpm --filter api prisma:generate && pnpm --filter api build
+    startCommand: NODE_ENV=production pnpm --filter api start:prod
     healthCheckPath: /api/health
     envVars:
-      - key: NODE_ENV
-        value: production
       - key: PORT
         value: 4000
       - key: DATABASE_URL
