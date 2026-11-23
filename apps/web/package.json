@@ -31,9 +31,6 @@
     "react-player": "^3.4.0",
     "tailwind-merge": "^3.7.0"
   },
-  "optionalDependencies": {
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.3.5"
-  },
   "devDependencies": {
     "@tailwindcss/turbopack": "4.3.3",
     "@testing-library/jest-dom": "^7.0.1",
