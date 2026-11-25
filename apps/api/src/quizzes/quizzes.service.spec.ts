@@ -69,6 +69,15 @@ describe('QuizzesService', () => {
     service = module.get<QuizzesService>(QuizzesService);
     prismaService = module.get<PrismaService>(PrismaService);
 
+    // These tests cover enrolment and answer masking; the learning order (quiz gate) has its own tests
+    // in progress/course-access.spec.ts, so here every quiz is open and nothing has been passed yet
+    (service as any).access = {
+      forCourse: jest.fn(async () => ({ access: { lessons: new Map(), quizzes: { get: () => ({ open: true }) } }, quizzes: [] })),
+      assertQuizOpen: jest.fn(async () => undefined),
+      hasPassed: jest.fn(async () => false),
+      studyTarget: jest.fn(async () => ({ courseId: null, lessonId: null })),
+    };
+
     jest.clearAllMocks();
   });
 
@@ -1425,6 +1434,93 @@ describe('QuizzesService', () => {
         expect(plausibleStart('2026-11-19T09:00:00Z', now)).toBe(now); // over a day old
         expect(plausibleStart(undefined, now)).toBe(now);
       });
+    });
+  });
+  describe('quizzes after videos (lesson and module quizzes)', () => {
+    const questions = [
+      { id: 'q1', questionText: 'Q1', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], correctAnswer: 'a', marks: 5, displayOrder: 0 },
+      { id: 'q2', questionText: 'Q2', options: [{ id: 'a', text: 'A' }, { id: 'b', text: 'B' }], correctAnswer: 'b', marks: 5, displayOrder: 1 },
+    ];
+    const quizOf = (attachmentType: QuizAttachmentType) => ({
+      id: 'quiz-1',
+      title: 'Lesson quiz',
+      attachmentType,
+      courseId: attachmentType === QuizAttachmentType.COURSE ? 'course-1' : null,
+      moduleId: null,
+      lessonId: attachmentType === QuizAttachmentType.LESSON ? 'lesson-1' : null,
+      passMark: 10,
+      totalMarks: 10,
+      maxAttempts: 2,
+      timeLimit: null,
+      status: QuizStatus.PUBLISHED,
+      questions,
+    });
+    const failingAnswers = { answers: [{ questionId: 'q1', selectedAnswer: 'a' }, { questionId: 'q2', selectedAnswer: 'a' }] };
+
+    const setUpSubmit = (attachmentType: QuizAttachmentType, attemptsSoFar: number) => {
+      mockPrismaService.quiz.findUnique = jest.fn().mockResolvedValue(quizOf(attachmentType));
+      mockPrismaService.lesson.findUnique = jest.fn().mockResolvedValue({ id: 'lesson-1', module: { courseId: 'course-1' } });
+      mockPrismaService.courseEnrollment.findFirst = jest.fn().mockResolvedValue({ id: 'enrol-1' });
+      mockPrismaService.quizAttempt = {
+        ...mockPrismaService.quizAttempt,
+        count: jest.fn().mockResolvedValue(attemptsSoFar),
+        create: jest.fn().mockResolvedValue({ id: 'attempt-new', submittedAt: new Date() }),
+      } as any;
+    };
+
+    it('lets students retry without an attempt limit and hides answers until they pass', async () => {
+      setUpSubmit(QuizAttachmentType.LESSON, 5);
+      const result = await service.submitQuiz('quiz-1', 'student-1', failingAnswers as any);
+      expect(result.passed).toBe(false);
+      expect(result.answersVisible).toBe(false);
+      expect(result.correctAnswers).toEqual([]);
+    });
+
+    it('shows the answers as soon as the student passes', async () => {
+      setUpSubmit(QuizAttachmentType.LESSON, 1);
+      const result = await service.submitQuiz('quiz-1', 'student-1', {
+        answers: [{ questionId: 'q1', selectedAnswer: 'a' }, { questionId: 'q2', selectedAnswer: 'b' }],
+      } as any);
+      expect(result.passed).toBe(true);
+      expect(result.answersVisible).toBe(true);
+      expect(result.correctAnswers).toHaveLength(2);
+    });
+
+    it('keeps course quizzes as before: attempt limit applies and answers are shown', async () => {
+      setUpSubmit(QuizAttachmentType.COURSE, 2);
+      await expect(service.submitQuiz('quiz-1', 'student-1', failingAnswers as any)).rejects.toThrow('Maximum attempts (2) reached');
+
+      setUpSubmit(QuizAttachmentType.COURSE, 0);
+      const result = await service.submitQuiz('quiz-1', 'student-1', failingAnswers as any);
+      expect(result.answersVisible).toBe(true);
+      expect(result.correctAnswers).toHaveLength(2);
+    });
+
+    it('hides correct answers in a failed attempt review until the quiz is passed, but keeps the score', async () => {
+      mockPrismaService.quizAttempt = {
+        ...mockPrismaService.quizAttempt,
+        findUnique: jest.fn().mockResolvedValue({
+          id: 'attempt-1',
+          quizId: 'quiz-1',
+          studentId: 'student-1',
+          answers: failingAnswers.answers,
+          score: 5,
+          passed: false,
+          startedAt: new Date(),
+          submittedAt: new Date(),
+          quiz: quizOf(QuizAttachmentType.LESSON),
+          student: { id: 'student-1', firstName: 'A', lastName: 'B', admissionId: 'X' },
+        }),
+      } as any;
+      const result = await service.getAttemptDetail('attempt-1', 'student-1', UserRole.STUDENT);
+      expect(result.answersVisible).toBe(false);
+      expect(result.correctCount).toBe(1);
+      expect(result.questions.every((q) => q.correctAnswer === null && q.isCorrect === null)).toBe(true);
+      expect(result.questions[0].selectedAnswer).toBe('a');
+
+      // Staff always see the full review
+      const staffView = await service.getAttemptDetail('attempt-1', 'staff-1', UserRole.STAFF);
+      expect(staffView.questions[0].correctAnswer).toBe('a');
     });
   });
 });

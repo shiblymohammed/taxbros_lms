@@ -17,7 +17,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Clock, AlertCircle, CheckCircle } from 'lucide-react';
+import { Loader2, Clock, AlertCircle, CheckCircle, Lock, RotateCcw } from 'lucide-react';
+import Link from 'next/link';
+import { EmptyState } from '@/components/features/student/student-ui';
+import { PageContainer } from '@/components/layout/page-header';
+import { blockerText, type Blocker } from '@/hooks/use-student-overview';
 
 interface QuizQuestion {
   id: string;
@@ -35,6 +39,10 @@ interface QuizData {
   totalMarks: number;
   timeLimit: number | null;
   questions: QuizQuestion[];
+  /** Lesson and module quizzes: unlimited attempts, pass to unlock the next lesson or module */
+  afterVideo?: boolean;
+  passed?: boolean;
+  attemptCount?: number;
 }
 
 interface Answer {
@@ -53,6 +61,8 @@ export default function QuizTakingPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Quiz after a video that the student has not reached yet (learning order)
+  const [locked, setLocked] = useState<{ blockedBy: Blocker | null; courseId?: string } | null>(null);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const [unansweredQuestions, setUnansweredQuestions] = useState<string[]>([]);
   // Time limit (R25): counts down from when the quiz was opened and submits automatically at zero
@@ -75,6 +85,10 @@ export default function QuizTakingPage() {
         setNow(Date.now());
         setError(null);
       } catch (err: any) {
+        if (err.response?.status === 403 && err.response?.data?.code === 'QUIZ_LOCKED') {
+          setLocked({ blockedBy: err.response.data.blockedBy ?? null, courseId: err.response.data.courseId });
+          return;
+        }
         console.error('Error loading quiz:', err);
         setError(err.response?.data?.message || 'Failed to load quiz');
         toast({
@@ -198,6 +212,40 @@ export default function QuizTakingPage() {
     );
   }
 
+  if (locked) {
+    const b = locked.blockedBy;
+    const target = b && locked.courseId
+      ? b.kind === 'QUIZ'
+        ? `/student/quizzes/${b.id}`
+        : `/student/courses/${locked.courseId}/lessons/${b.id}`
+      : null;
+    return (
+      <PageContainer className="max-w-3xl">
+        <EmptyState
+          icon={Lock}
+          title="This quiz is not open yet"
+          actions={
+            <>
+              {target && (
+                <Link href={target} className="inline-flex h-11 items-center rounded-xl bg-brand-strong px-5 text-sm font-semibold text-white hover:bg-brand">
+                  {b?.kind === 'QUIZ' ? 'Take that quiz' : 'Watch the lesson'}
+                </Link>
+              )}
+              <Link
+                href={locked.courseId ? `/student/courses/${locked.courseId}` : '/student/quizzes'}
+                className="inline-flex h-11 items-center rounded-xl border bg-white px-5 text-sm font-semibold text-brand-strong hover:bg-slate-50"
+              >
+                {locked.courseId ? 'Course outline' : 'Back to tests'}
+              </Link>
+            </>
+          }
+        >
+          Quizzes open after their video. {blockerText(b)}, then come back here.
+        </EmptyState>
+      </PageContainer>
+    );
+  }
+
   if (error || !quiz) {
     return (
       <div className="container mx-auto p-6">
@@ -271,6 +319,15 @@ export default function QuizTakingPage() {
           </div>
         </CardContent>
       </Card>
+
+      {quiz.afterVideo && (
+        <p className="mb-6 flex items-start gap-2 rounded-xl bg-white px-4 py-3 text-sm text-slate-600 ring-1 ring-border">
+          <RotateCcw className="mt-0.5 h-4 w-4 shrink-0 text-brand" aria-hidden="true" />
+          {quiz.passed
+            ? 'You have already passed this quiz. You can take it again to practise.'
+            : `Score ${quiz.passMark} or more to unlock the next step. You can rewatch the video and try as many times as you need; the correct answers are shown once you pass.`}
+        </p>
+      )}
 
       {/* Progress Indicator */}
       <Card className="mb-6">

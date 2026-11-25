@@ -23,5 +23,6 @@ export const STUDENT_NAV: NavItem[] = [
   { href: '/student/dashboard', label: 'Dashboard', icon: 'dashboard', group: 'Learning', tabLabel: 'Home' },
   { href: '/student/courses', label: 'My Courses', icon: 'courses', group: 'Learning', tabLabel: 'Courses' },
   { href: '/student/labs', label: 'Practice Labs', icon: 'labs', group: 'Learning', tabLabel: 'Labs' },
+  { href: '/student/quizzes', label: 'Tests & Exams', icon: 'quizzes', group: 'Learning', tabLabel: 'Tests' },
   { href: '/student/profile', label: 'Profile', icon: 'profile', group: 'Account' },
 ];

@@ -1,10 +1,12 @@
 import {
+  BadRequestException,
   Injectable,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UserRole, LessonProgressStatus } from '@prisma/client';
+import { CourseAccessService } from './course-access.service';
 
 /**
  * Progress Service
@@ -23,7 +25,28 @@ import { UserRole, LessonProgressStatus } from '@prisma/client';
  */
 @Injectable()
 export class ProgressService {
-  constructor(private readonly prisma: PrismaService) {}
+  /** Learning order (quiz gate); only needs the database client */
+  readonly access: CourseAccessService;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.access = new CourseAccessService(prisma);
+  }
+
+  /**
+   * "Mark as complete" by hand is for lessons without a known video length; otherwise the video
+   * must have been watched to 90% (where it completes on its own anyway).
+   */
+  async assertWatchedEnough(studentId: string, lessonId: string): Promise<void> {
+    const [lesson, progress] = await Promise.all([
+      this.prisma.lesson.findUnique({ where: { id: lessonId }, select: { duration: true } }),
+      this.prisma.lessonProgress.findUnique({ where: { studentId_lessonId: { studentId, lessonId } } }),
+    ]);
+    if (!lesson) throw new NotFoundException(`Lesson with ID ${lessonId} not found`);
+    if (!lesson.duration || progress?.status === LessonProgressStatus.COMPLETED) return;
+    if (!this.shouldAutoComplete(progress?.lastPosition ?? 0, lesson.duration)) {
+      throw new BadRequestException('Watch the video to the end to complete this lesson');
+    }
+  }
 
   /**
    * Complete a lesson and update course progress
@@ -190,6 +213,22 @@ export class ProgressService {
    * @param duration - Total video duration in seconds
    * @returns true if position >= 90% of duration
    */
+  /**
+   * Furthest point a student can have reached by watching (not skipping) since the last saved position:
+   * up to double speed for the time that has passed, plus a little slack for network delays.
+   * The player saves every 10 seconds of playback, so honest watching always stays within it.
+   */
+  maxReachablePosition(
+    current: { lastPosition: number; updatedAt: Date } | null,
+    now: Date = new Date(),
+  ): number {
+    const SLACK_SECONDS = 15;
+    const MAX_PLAYBACK_RATE = 2;
+    if (!current) return SLACK_SECONDS;
+    const elapsed = Math.max(0, (now.getTime() - new Date(current.updatedAt).getTime()) / 1000);
+    return current.lastPosition + elapsed * MAX_PLAYBACK_RATE + SLACK_SECONDS;
+  }
+
   shouldAutoComplete(position: number, duration: number | null): boolean {
     if (!duration || duration <= 0) {
       return false;
@@ -218,7 +257,7 @@ export class ProgressService {
     studentId: string,
     updateDto: { position: number; watchedDuration?: number },
   ) {
-    const { position, watchedDuration } = updateDto;
+    const { position: requestedPosition, watchedDuration } = updateDto;
     // Verify lesson exists and get duration
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
@@ -268,6 +307,10 @@ export class ProgressService {
         autoCompleted: false,
       };
     }
+
+    // First watch: no skipping ahead. Accept at most what real playback could have reached since the
+    // last save (rewatching a completed lesson returned above, so seeking is free there).
+    const position = Math.min(requestedPosition, this.maxReachablePosition(currentProgress));
 
     // Calculate the incremental watched duration
     // If watchedDuration is provided, use it; otherwise calculate from position difference
@@ -576,14 +619,21 @@ export class ProgressService {
       progressRecords.map((p) => [p.lessonId, p]),
     );
 
+    // Learning order: which lessons and quizzes are open for this student
+    const { access, quizzes } = await this.access.forCourse(studentId, course.id);
+
     // Build response with all lessons and their progress
     const result = course.modules.flatMap((module) =>
       module.lessons.map((lesson) => {
         const progress = progressMap.get(lesson.id);
+        const state = access.lessons.get(lesson.id);
         return {
           lessonId: lesson.id,
           lessonTitle: lesson.title,
+          moduleId: module.id,
           moduleTitle: module.title,
+          locked: state ? !state.open : false,
+          blockedBy: state?.blockedBy ?? null,
           displayOrder: lesson.displayOrder,
           duration: lesson.duration,
           status: progress
@@ -602,6 +652,16 @@ export class ProgressService {
       enrollmentStatus: enrollment.status,
       progressPercentage: enrollment.progressPercentage,
       lessons: result,
+      // Published quizzes in the course with this student's state; after-video ones follow the learning order
+      quizzes: quizzes.map((q) => {
+        const state = access.quizzes.get(q.quizId);
+        return {
+          ...q,
+          afterVideo: q.attachmentType !== 'COURSE',
+          locked: state ? !state.open : false,
+          blockedBy: state?.blockedBy ?? null,
+        };
+      }),
     };
   }
 

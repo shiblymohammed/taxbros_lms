@@ -72,6 +72,8 @@ export class ProgressController {
     if (!studentId) {
       throw new BadRequestException('Student ID not found in user context');
     }
+    // Locked lessons (learning order / quiz gate) cannot record progress
+    await this.progressService.access.assertLessonOpen(studentId, lessonId);
     return this.progressService.updatePosition(lessonId, studentId, updatePositionDto);
   }
 
@@ -203,6 +205,9 @@ export class ProgressController {
     if (!studentId) {
       throw new BadRequestException('Student ID not found in user context');
     }
+    // Only an open lesson whose video has been watched can be completed by hand
+    await this.progressService.access.assertLessonOpen(studentId, lessonId);
+    await this.progressService.assertWatchedEnough(studentId, lessonId);
     return this.progressService.completeLesson(studentId, lessonId);
   }
 

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ChevronLeft, ChevronRight, Home, Search } from 'lucide-react';
 import type { SessionUser } from '@/lib/auth';
 import { pageTrail } from '@/lib/breadcrumbs';
+import { cn } from '@/lib/utils';
 import type { NavItem } from '@/types/navigation';
 import { QuickSearch } from './quick-search';
 import { UserMenu } from './user-menu';
@@ -16,6 +17,7 @@ interface TopbarProps {
   user: SessionUser;
   signingOut: boolean;
   onSignOut: () => void;
+  className?: string;
 }
 
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -24,7 +26,7 @@ const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(n
  * Top bar of a signed-in area (design.md: Layout Components → Navbar).
  * Breadcrumbs show where you are (as in Canvas and Moodle), with quick page search and the account menu.
  */
-export function Topbar({ nav, pathname, user, signingOut, onSignOut }: TopbarProps) {
+export function Topbar({ nav, pathname, user, signingOut, onSignOut, className }: TopbarProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const { section, crumbs } = pageTrail(nav, pathname);
   const current = crumbs.at(-1);
@@ -45,7 +47,12 @@ export function Topbar({ nav, pathname, user, signingOut, onSignOut }: TopbarPro
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-white/90 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/75 sm:gap-3 sm:px-6 lg:px-8">
+    <header
+      className={cn(
+        'sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b bg-white/90 px-4 backdrop-blur supports-[backdrop-filter]:bg-white/75 sm:gap-3 sm:px-6 lg:px-8',
+        className,
+      )}
+    >
       {/* Phones: back to the parent page, then the page name */}
       <div className="flex min-w-0 flex-1 items-center gap-1 md:hidden">
         {back?.href ? (
