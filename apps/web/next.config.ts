@@ -33,6 +33,15 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Signed-in pages are Client Components behind AppShell, which shows a spinner until the
+    // session is confirmed in the browser, so they can never prerender an instant UI. The default
+    // ('warning') validates every page and logs "Could not validate ... instant navigation" on each
+    // one. Validate only segments that opt in with `export const instant = true`.
+    instantInsights: {
+      validationLevel: 'manual-warning',
+    },
+  },
   turbopack: {
     rules: {
       '*.css': {
