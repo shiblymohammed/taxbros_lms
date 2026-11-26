@@ -70,6 +70,11 @@ export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, 
     );
   }
 
+  // Student phone screens from the mobile design that bring their own header:
+  // Home (greeting + avatar), My Courses and Tests (title + action), and the lesson player (video edge to edge, no tab bar)
+  const isLessonPlayer = /^\/student\/courses\/[^/]+\/lessons\/[^/]+$/.test(pathname);
+  const ownMobileHeader = ['/student/dashboard', '/student/courses', '/student/quizzes'].includes(pathname) || isLessonPlayer;
+
   const isAdmin = user.role === 'ADMINISTRATOR' || user.role === 'SUPER_ADMIN';
   const isStaff = user.role === 'STAFF';
   const nav = isStaff ? staffNav(user.permissions) : isAdmin && adminNav ? adminNav : areaNav;
@@ -128,9 +133,10 @@ export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, 
           user={user}
           signingOut={signingOut}
           onSignOut={onSignOut}
+          className={ownMobileHeader ? 'max-md:hidden' : undefined}
         />
         {/* Room for the phone tab bar */}
-        <main id="main-content" className="flex-1 pb-24 lg:pb-0">
+        <main id="main-content" className={cn('flex-1 lg:pb-0', isLessonPlayer ? 'pb-6' : 'pb-24')}>
           {children}
         </main>
         <footer className="hidden border-t bg-white/60 px-4 py-4 text-xs text-slate-500 sm:px-6 lg:block lg:px-8">
@@ -138,7 +144,7 @@ export function AppShell({ roleLabel: areaLabel, nav: areaNav, adminNav, roles, 
         </footer>
       </div>
 
-      <BottomNav nav={nav} pathname={pathname} onMore={() => setDrawerOpen(true)} />
+      {!isLessonPlayer && <BottomNav nav={nav} pathname={pathname} onMore={() => setDrawerOpen(true)} />}
     </div>
   );
 }

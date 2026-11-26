@@ -190,7 +190,8 @@ describe('ProgressService', () => {
         watchedDuration: 850,
         completedAt: null,
         createdAt: new Date(),
-        updatedAt: new Date(),
+        // Last saved 30 seconds ago: watching from 850 s can reach 900 s since then
+        updatedAt: new Date(Date.now() - 30_000),
       });
       mockPrismaService.lessonProgress.upsert.mockResolvedValue({
         id: 'progress-123',
@@ -218,6 +219,39 @@ describe('ProgressService', () => {
       // Assert
       expect(result.autoCompleted).toBe(true);
       expect(result.lessonProgress.status).toBe(LessonProgressStatus.COMPLETED);
+    });
+
+    it('does not let a first watch skip ahead: a jump to the end is cut back and does not complete the lesson', async () => {
+      mockPrismaService.lesson.findUnique.mockResolvedValue(mockLesson);
+      mockPrismaService.lessonProgress.findUnique.mockResolvedValue({
+        id: 'progress-123',
+        studentId,
+        lessonId,
+        status: LessonProgressStatus.IN_PROGRESS,
+        lastPosition: 100,
+        watchedDuration: 100,
+        completedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(Date.now() - 10_000),
+      });
+      mockPrismaService.lessonProgress.upsert.mockImplementation(async (args: any) => ({ ...args.update, id: 'progress-123' }));
+
+      // Dragged straight to 95% (950 of 1000 s) ten seconds after the last save
+      const result = await service.updatePosition(lessonId, studentId, { position: 950 });
+
+      expect(result.autoCompleted).toBe(false);
+      const saved = mockPrismaService.lessonProgress.upsert.mock.calls.at(-1)[0].update;
+      // 10 s at up to 2x plus 15 s slack; real time keeps running between building the mock and
+      // the call, so allow a fraction of a second on top
+      expect(saved.lastPosition).toBeLessThan(100 + 10 * 2 + 15 + 1);
+      expect(saved.status).toBe(LessonProgressStatus.IN_PROGRESS);
+    });
+
+    it('allows normal playback, including double speed, between saves', () => {
+      const tenSecondsAgo = new Date(Date.now() - 10_000);
+      expect(service.maxReachablePosition(null)).toBe(15);
+      expect(service.maxReachablePosition({ lastPosition: 200, updatedAt: tenSecondsAgo })).toBeGreaterThanOrEqual(230);
+      expect(service.maxReachablePosition({ lastPosition: 200, updatedAt: tenSecondsAgo })).toBeLessThan(240);
     });
 
     it('should not update position if lesson is already completed', async () => {

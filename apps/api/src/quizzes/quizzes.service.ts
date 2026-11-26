@@ -10,6 +10,7 @@ import { UpdateQuizDto } from './dto/update-quiz.dto';
 import { CreateQuestionDto } from './dto/create-question.dto';
 import { UpdateQuestionDto } from './dto/update-question.dto';
 import { SubmitQuizDto } from './dto/submit-quiz.dto';
+import { CourseAccessService, isAfterVideoQuiz } from '../progress/course-access.service';
 import {
   QuizAttachmentType,
   QuizStatus,
@@ -33,7 +34,12 @@ import {
  */
 @Injectable()
 export class QuizzesService {
-  constructor(private readonly prisma: PrismaService) {}
+  /** Learning order: quizzes after videos open in sequence (only needs the database client) */
+  private readonly access: CourseAccessService;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.access = new CourseAccessService(prisma);
+  }
 
   /**
    * Create a new quiz
@@ -190,6 +196,11 @@ export class QuizzesService {
       where.lessonId = filters.lessonId;
     }
 
+    // A student's active enrolments, read at the same time as the quizzes (used below)
+    const enrolmentsLoad = isStudent
+      ? this.prisma.courseEnrollment.findMany({ where: { studentId, status: 'ACTIVE' }, select: { courseId: true } })
+      : Promise.resolve([] as Array<{ courseId: string }>);
+
     const quizzes = await this.prisma.quiz.findMany({
       where,
       include: {
@@ -208,19 +219,28 @@ export class QuizzesService {
     }
 
     // Students only get quizzes from courses they are actively enrolled in (R2.11)
-    const enrolments = await this.prisma.courseEnrollment.findMany({
-      where: { studentId, status: 'ACTIVE' },
-      select: { courseId: true },
-    });
+    const enrolments = await enrolmentsLoad;
     const enrolled = new Set(enrolments.map((e) => e.courseId));
 
+    const mine = withCourse.filter((quiz) => quiz.owningCourseId && enrolled.has(quiz.owningCourseId));
+
+    // Quizzes after videos open in learning order: say which are still locked and why
+    const gatedCourses = [...new Set(mine.filter(isAfterVideoQuiz).map((q) => q.owningCourseId as string))];
+    const accessByCourse = new Map(
+      await Promise.all(gatedCourses.map(async (courseId) => [courseId, (await this.access.forCourse(studentId!, courseId)).access] as const)),
+    );
+
     // R25.2: never send answer keys to students
-    return withCourse
-      .filter((quiz) => quiz.owningCourseId && enrolled.has(quiz.owningCourseId))
-      .map((quiz) => ({
+    return mine.map((quiz) => {
+      const state = isAfterVideoQuiz(quiz) ? accessByCourse.get(quiz.owningCourseId as string)?.quizzes.get(quiz.id) : undefined;
+      return {
         ...quiz,
+        afterVideo: isAfterVideoQuiz(quiz),
+        locked: isAfterVideoQuiz(quiz) ? !state?.open : false,
+        blockedBy: state?.blockedBy ?? null,
         questions: quiz.questions.map(({ correctAnswer: _correctAnswer, ...question }) => question),
-      }));
+      };
+    });
   }
 
   /** Adds owningCourseId: the course a quiz belongs to, whether attached to the course, a module or a lesson. */
@@ -300,6 +320,10 @@ export class QuizzesService {
       // Validate student enrollment based on attachment type
       await this.validateStudentEnrollment(quiz, userId);
 
+      // Quizzes after videos open only once the student reaches them
+      await this.access.assertQuizOpen(userId, quiz);
+      const afterVideo = isAfterVideoQuiz(quiz);
+
       // Mask correct answers for students
       const maskedQuestions = quiz.questions.map((question) => {
         const { correctAnswer, ...questionWithoutAnswer } = question;
@@ -312,14 +336,15 @@ export class QuizzesService {
         ? quiz.maxAttempts - attemptCount
         : null; // null means unlimited
 
+      // Quizzes after videos can be retried without limit until passed
       return {
         ...quiz,
         questions: maskedQuestions,
         attemptCount,
-        remainingAttempts,
-        hasAttemptsRemaining: quiz.maxAttempts
-          ? attemptCount < quiz.maxAttempts
-          : true,
+        remainingAttempts: afterVideo ? null : remainingAttempts,
+        hasAttemptsRemaining: afterVideo || !quiz.maxAttempts ? true : attemptCount < quiz.maxAttempts,
+        afterVideo,
+        passed: quiz.attempts.some((a) => a.passed),
       };
     }
 
@@ -596,8 +621,12 @@ export class QuizzesService {
     // Validate student enrollment
     await this.validateStudentEnrollment(quiz, studentId);
 
+    // Quizzes after videos open only once the student reaches them, and have no attempt limit
+    await this.access.assertQuizOpen(studentId, quiz);
+    const afterVideo = isAfterVideoQuiz(quiz);
+
     // Check if student has remaining attempts
-    if (quiz.maxAttempts) {
+    if (quiz.maxAttempts && !afterVideo) {
       const attemptCount = await this.prisma.quizAttempt.count({
         where: {
           quizId,
@@ -679,6 +708,9 @@ export class QuizzesService {
       },
     });
 
+    // Quizzes after videos reveal the answers only once the student has passed
+    const answersVisible = !afterVideo || passed || (await this.access.hasPassed(studentId, quizId));
+
     // Return score, passed status, correct answers array, and attempt ID
     return {
       attemptId: attempt.id,
@@ -686,7 +718,8 @@ export class QuizzesService {
       totalMarks: quiz.totalMarks,
       passMark: quiz.passMark,
       passed,
-      correctAnswers,
+      answersVisible,
+      correctAnswers: answersVisible ? correctAnswers : [],
       submittedAt: attempt.submittedAt,
     };
   }
@@ -924,25 +957,34 @@ export class QuizzesService {
       selectedAnswer: string;
     }>;
 
+    // Quizzes after videos: a student sees the correct answers only after passing
+    const afterVideo = isAfterVideoQuiz(attempt.quiz);
+    const answersVisible =
+      userRole !== UserRole.STUDENT || !afterVideo || attempt.passed || (await this.access.hasPassed(attempt.studentId, attempt.quiz.id));
+
     // Build detailed questions with answers
     const questionsWithAnswers = attempt.quiz.questions.map((question) => {
       const studentAnswer = answers.find((a) => a.questionId === question.id);
 
+      const isCorrect = studentAnswer?.selectedAnswer === question.correctAnswer;
       return {
         id: question.id,
         questionText: question.questionText,
         options: question.options,
-        correctAnswer: question.correctAnswer,
+        correctAnswer: answersVisible ? question.correctAnswer : null,
         marks: question.marks,
         displayOrder: question.displayOrder,
         selectedAnswer: studentAnswer?.selectedAnswer || null,
-        isCorrect: studentAnswer?.selectedAnswer === question.correctAnswer,
-        marksAwarded:
-          studentAnswer?.selectedAnswer === question.correctAnswer
-            ? question.marks
-            : 0,
+        isCorrect: answersVisible ? isCorrect : null,
+        marksAwarded: answersVisible ? (isCorrect ? question.marks : 0) : null,
       };
     });
+    const correctCount = attempt.quiz.questions.filter((question) => {
+      const studentAnswer = answers.find((a) => a.questionId === question.id);
+      return studentAnswer?.selectedAnswer === question.correctAnswer;
+    }).length;
+    // Where to rewatch before trying again, and the course to continue in
+    const studyTarget = await this.access.studyTarget(attempt.quiz);
 
     return {
       id: attempt.id,
@@ -957,6 +999,12 @@ export class QuizzesService {
       passed: attempt.passed,
       startedAt: attempt.startedAt,
       submittedAt: attempt.submittedAt,
+      attachmentType: attempt.quiz.attachmentType,
+      afterVideo,
+      answersVisible,
+      correctCount,
+      courseId: studyTarget.courseId,
+      studyLessonId: studyTarget.lessonId,
       questions: questionsWithAnswers,
     };
   }

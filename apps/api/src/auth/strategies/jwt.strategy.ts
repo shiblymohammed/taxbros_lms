@@ -2,7 +2,23 @@
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { UserRole, UserStatus } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+
+/** One row of the per-request user lookup (user joined with its student and staff profile). */
+interface SessionRow {
+  id: string;
+  email: string;
+  role: string;
+  status: string;
+  mustChangePassword: boolean;
+  studentId: string | null;
+  studentFirstName: string | null;
+  studentLastName: string | null;
+  staffId: string | null;
+  staffFirstName: string | null;
+  staffLastName: string | null;
+}
 
 export interface JwtPayload {
   sub: string;
@@ -52,14 +68,32 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   async validate(payload: JwtPayload) {
     const { sub: userId } = payload;
 
-    // Load user from database
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      include: {
-        studentProfile: true,
-        staffProfile: true,
-      },
-    });
+    // Load the user and both profiles in ONE query. This runs on every authenticated request;
+    // `findUnique` with `include` sends one query per relation (three round trips to the database).
+    const rows = await this.prisma.$queryRaw<SessionRow[]>`
+      SELECT u."id", u."email", u."role"::text AS "role", u."status"::text AS "status", u."mustChangePassword",
+             s."id" AS "studentId", s."firstName" AS "studentFirstName", s."lastName" AS "studentLastName",
+             st."id" AS "staffId", st."firstName" AS "staffFirstName", st."lastName" AS "staffLastName"
+      FROM "users" u
+      LEFT JOIN "students" s ON s."userId" = u."id"
+      LEFT JOIN "staff" st ON st."userId" = u."id"
+      WHERE u."id" = ${userId}
+      LIMIT 1`;
+    const row = rows[0];
+    const user = row && {
+      id: row.id,
+      email: row.email,
+      role: row.role as UserRole,
+      status: row.status as UserStatus,
+      mustChangePassword: row.mustChangePassword,
+      // Only the fields callers read (auth/me shows the name)
+      studentProfile: row.studentId
+        ? { id: row.studentId, firstName: row.studentFirstName, lastName: row.studentLastName }
+        : null,
+      staffProfile: row.staffId
+        ? { id: row.staffId, firstName: row.staffFirstName, lastName: row.staffLastName }
+        : null,
+    };
 
     if (!user) {
       throw new UnauthorizedException('User not found');

@@ -1,196 +1,51 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
+  ArrowRight,
   BookOpen,
-  CheckCircle2,
-  ChevronRight,
-  Circle,
+  Calculator,
+  ChartColumn,
+  Check,
   ClipboardCheck,
   Clock,
   FlaskConical,
+  Hourglass,
   Loader2,
   Play,
+  Sparkles,
   Target,
   Trophy,
 } from 'lucide-react';
 import { CourseProgressCard, ProgressBar } from '@/components/features/courses/course-progress-card';
+import {
+  ComingSoonPill,
+  InitialsAvatar,
+  LabShortcuts,
+  QuietNote,
+  SectionHeading,
+} from '@/components/features/student/student-ui';
 import { PageContainer } from '@/components/layout/page-header';
-import { apiClient, quizzesApi, type Quiz } from '@/lib/api';
-import { continueCourse, greeting } from '@/hooks/use-student-progress';
+import { continueCourse, greeting, type StudentCourse } from '@/hooks/use-student-progress';
+import { groupByModule, hasNoLessons, nextStep, testAverage, useStudentOverview, type NextStep } from '@/hooks/use-student-overview';
 import { cn } from '@/lib/utils';
 
-interface Course {
-  enrollmentId: string;
-  courseId: string;
-  courseTitle: string;
-  courseCoverImage: string | null;
-  enrollmentStatus: 'ACTIVE' | 'COMPLETED' | 'DROPPED';
-  progressPercentage: number;
-  totalLessons: number;
-  completedLessons: number;
-  lastAccessedAt: string | null;
-  enrolledAt: string;
+const heroClass =
+  'relative overflow-hidden rounded-[1.6rem] bg-gradient-to-br from-brand-strong via-[#135d6e] to-brand p-5 text-white shadow-lg sm:p-7';
+
+function HeroDecor() {
+  return (
+    <>
+      <span className="pointer-events-none absolute -right-12 -top-16 h-52 w-52 rounded-full bg-white/10" aria-hidden="true" />
+      <span className="pointer-events-none absolute -bottom-24 right-20 h-44 w-44 rounded-full bg-white/5" aria-hidden="true" />
+      <Calculator className="pointer-events-none absolute -right-3 bottom-3 h-28 w-28 rotate-[-12deg] text-white/[0.07] sm:h-36 sm:w-36" aria-hidden="true" />
+    </>
+  );
 }
 
-interface StudentProgress {
-  studentId: string;
-  studentName: string;
-  courses: Course[];
-}
-
-interface NextLesson {
-  courseId: string;
-  lessonId: string;
-  lessonTitle: string;
-  moduleTitle: string;
-}
-
-interface AvailableQuiz extends Quiz {
-  courseTitle?: string;
-  attemptCount: number;
-  bestScore?: number;
-  bestAttemptPassed: boolean;
-  lastAttemptDate?: string;
-}
-
+/** Student Home (TAXBROS mobile design: greeting, Continue Learning, shortcuts, This Week's Focus). */
 export default function StudentDashboardPage() {
-  const router = useRouter();
-  const [progress, setProgress] = useState<StudentProgress | null>(null);
-  const [nextLessons, setNextLessons] = useState<Map<string, NextLesson>>(new Map());
-  const [availableQuizzes, setAvailableQuizzes] = useState<AvailableQuiz[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        // The signed-in user's Student profile ID (students cannot list /students)
-        const userResponse = await apiClient.get<{ studentId: string | null }>('/auth/me');
-        const studentId = userResponse.data.studentId;
-
-        if (!studentId) {
-          setError('No student profile found for this user');
-          setLoading(false);
-          return;
-        }
-
-        // Fetch student progress
-        const progressResponse = await apiClient.get(`/students/${studentId}/progress`);
-        setProgress(progressResponse.data);
-
-        // Fetch next unwatched lesson for each enrolled course
-        const nextLessonsMap = new Map<string, NextLesson>();
-        for (const course of progressResponse.data.courses) {
-          if (course.enrollmentStatus === 'ACTIVE') {
-            try {
-              const courseProgressResponse = await apiClient.get(`/courses/${course.courseId}/progress`);
-              const courseProgress = courseProgressResponse.data;
-              
-              // Find the first lesson that is not completed
-              const nextLesson = courseProgress.lessons?.find(
-                (lesson: any) => lesson.status !== 'COMPLETED'
-              );
-              
-              if (nextLesson) {
-                nextLessonsMap.set(course.courseId, {
-                  courseId: course.courseId,
-                  lessonId: nextLesson.lessonId,
-                  lessonTitle: nextLesson.lessonTitle,
-                  moduleTitle: nextLesson.moduleTitle,
-                });
-              }
-            } catch (err) {
-              console.error(`Failed to fetch next lesson for course ${course.courseId}:`, err);
-            }
-          }
-        }
-        setNextLessons(nextLessonsMap);
-
-        // Fetch available quizzes (published quizzes in enrolled courses)
-        try {
-          const quizzesResponse = await quizzesApi.getAvailableQuizzes(studentId);
-          
-          // Filter quizzes to only those in enrolled courses
-          const enrolledCourseIds = progressResponse.data.courses
-            .filter((c: Course) => c.enrollmentStatus === 'ACTIVE')
-            .map((c: Course) => c.courseId);
-          
-          // The API already limits students to their enrolled courses; owningCourseId also covers
-          // quizzes attached to a module or a lesson
-          const courseOf = (quiz: Quiz) => quiz.owningCourseId ?? quiz.courseId;
-          const enrolledQuizzes = quizzesResponse.filter((quiz: Quiz) => {
-            const courseId = courseOf(quiz);
-            return !!courseId && enrolledCourseIds.includes(courseId);
-          });
-
-          // Fetch attempt history for each quiz
-          const enrichedQuizzes: AvailableQuiz[] = [];
-          
-          for (const quiz of enrolledQuizzes) {
-            try {
-              const attempts = await quizzesApi.getQuizAttempts(quiz.id);
-              
-              // Calculate best score and attempt count
-              const bestAttempt = attempts.reduce((best, current) => {
-                return current.score > (best?.score || 0) ? current : best;
-              }, attempts[0]);
-
-              const courseTitle = progressResponse.data.courses.find(
-                (c: Course) => c.courseId === courseOf(quiz)
-              )?.courseTitle || 'Unknown Course';
-
-              enrichedQuizzes.push({
-                ...quiz,
-                courseTitle,
-                attemptCount: attempts.length,
-                bestScore: bestAttempt?.score,
-                bestAttemptPassed: bestAttempt?.passed || false,
-                lastAttemptDate: attempts[0]?.submittedAt,
-              });
-            } catch {
-              // No attempts yet for this quiz
-              const courseTitle = progressResponse.data.courses.find(
-                (c: Course) => c.courseId === courseOf(quiz)
-              )?.courseTitle || 'Unknown Course';
-
-              enrichedQuizzes.push({
-                ...quiz,
-                courseTitle,
-                attemptCount: 0,
-                bestAttemptPassed: false,
-              });
-            }
-          }
-          
-          setAvailableQuizzes(enrichedQuizzes);
-        } catch (err) {
-          console.error('Failed to fetch quizzes:', err);
-        }
-      } catch (err: any) {
-        console.error('Error fetching student dashboard data:', err);
-        setError(err.response?.data?.message || 'Failed to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
-
-  const handleContinueLearning = (courseId: string) => {
-    const nextLesson = nextLessons.get(courseId);
-    if (nextLesson) {
-      router.push(`/student/courses/${courseId}/lessons/${nextLesson.lessonId}`);
-    } else {
-      router.push(`/student/courses/${courseId}`);
-    }
-  };
+  const { progress, lessonsByCourse, quizzesByCourse, quizzes, loading, error } = useStudentOverview();
 
   if (loading) {
     return (
@@ -203,231 +58,323 @@ export default function StudentDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 px-4 text-center" role="alert">
-        <p className="text-lg text-red-600">{error}</p>
-      </div>
+      <PageContainer>
+        <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </p>
+      </PageContainer>
     );
   }
 
-  const courses = progress?.courses ?? [];
-  const activeCourses = courses.filter((c) => c.enrollmentStatus === 'ACTIVE');
+  const name = progress?.studentName || 'Student';
+  const firstName = name.split(' ')[0];
+  const courses = (progress?.courses ?? []).filter((c) => c.enrollmentStatus !== 'DROPPED');
+  const active = courses.filter((c) => c.enrollmentStatus === 'ACTIVE');
+  const withLessons = active.filter((c) => !hasNoLessons(c));
+  const waiting = active.filter(hasNoLessons);
   const completedCount = courses.filter((c) => c.enrollmentStatus === 'COMPLETED' || c.progressPercentage >= 100).length;
-  const current = continueCourse(courses);
-  const currentNext = current ? nextLessons.get(current.courseId) : undefined;
-  const pendingQuizzes = availableQuizzes.filter((q) => !q.bestAttemptPassed);
-  const firstName = (progress?.studentName || 'Student').split(' ')[0];
+  const pendingQuizzes = quizzes.filter((q) => !q.passed);
+  const average = testAverage(quizzes);
+  const nothingPublished = courses.every(hasNoLessons);
+  const current = continueCourse(withLessons);
+  // Next step in learning order: a lesson to watch, or a quiz to pass before the next lesson opens
+  const stepIn = (courseId: string) => nextStep(courseId, lessonsByCourse.get(courseId), quizzesByCourse.get(courseId));
+  const currentNext = current ? stepIn(current.courseId) : undefined;
+  // "Direct Tax – Module 3" over the module name, as in the mobile design
+  const currentModule =
+    current && currentNext ? groupByModule(lessonsByCourse.get(current.courseId) ?? []).find((g) => g.title === currentNext.moduleTitle) : undefined;
 
-  // This week's focus: the next lesson in each course, then quizzes still to pass
+  // This week's focus: the next lesson in each course, then quizzes (passed ones ticked)
+  const steps = withLessons
+    .map((c) => ({ course: c, next: stepIn(c.courseId) }))
+    .filter((f): f is { course: StudentCourse; next: NextStep } => !!f.next)
+    .slice(0, 3);
+  const stepQuizIds = new Set(steps.flatMap((f) => (f.next.kind === 'quiz' ? [f.next.quiz.quizId] : [])));
   const focus = [
-    ...activeCourses
-      .map((c) => ({ course: c, next: nextLessons.get(c.courseId) }))
-      .filter((f): f is { course: Course; next: NextLesson } => !!f.next)
+    ...steps.map(({ course, next }) => ({
+      key: `step-${course.courseId}`,
+      label: next.kind === 'quiz' ? `Pass “${next.title}” to unlock the next lesson` : `Complete “${next.title}”`,
+      hint: course.courseTitle,
+      href: next.href,
+      done: false,
+    })),
+    // Other tests: open ones still to pass first, then passed ones ticked (locked ones wait their turn)
+    ...[...pendingQuizzes.filter((q) => !q.locked), ...quizzes.filter((q) => q.passed)]
+      .filter((q) => !stepQuizIds.has(q.id))
       .slice(0, 3)
-      .map(({ course, next }) => ({
-        key: `lesson-${course.courseId}`,
-        label: `Watch “${next.lessonTitle}”`,
-        hint: course.courseTitle,
-        href: `/student/courses/${course.courseId}/lessons/${next.lessonId}`,
-        done: false,
-      })),
-    ...availableQuizzes.slice(0, 3).map((q) => ({
+      .map((q) => ({
       key: `quiz-${q.id}`,
-      label: q.bestAttemptPassed ? `Passed “${q.title}”` : `Attempt “${q.title}”`,
-      hint: q.courseTitle ?? '',
+      label: q.passed ? `Passed “${q.title}”` : `Attempt “${q.title}”`,
+      hint: q.courseTitle,
       href: `/student/quizzes/${q.id}`,
-      done: q.bestAttemptPassed,
+      done: q.passed,
     })),
   ];
 
-  const tiles = [
-    { href: '/student/courses', icon: BookOpen, title: 'My Courses', text: `${activeCourses.length} enrolled`, tone: 'bg-brand-soft text-brand-strong' },
-    { href: '/student/labs', icon: FlaskConical, title: 'Practice Labs', text: 'GST · ITR · MCA', tone: 'bg-orange-50 text-flame' },
-    { href: '#quizzes', icon: ClipboardCheck, title: 'Tests & Quizzes', text: `${pendingQuizzes.length} pending`, tone: 'bg-rose-50 text-rose-500' },
-    { href: '/student/courses', icon: Trophy, title: 'Completed', text: `${completedCount} course${completedCount === 1 ? '' : 's'}`, tone: 'bg-emerald-50 text-emerald-600' },
-  ];
-
-  return (
-    <PageContainer className="space-y-6 sm:space-y-8">
-      {/* Greeting */}
-      <div>
+  const header = (
+    <div className="flex items-center justify-between gap-4">
+      <div className="min-w-0">
         <p className="text-sm text-slate-500 sm:text-base">{greeting()},</p>
-        <h1 className="text-2xl font-extrabold text-slate-900 sm:text-3xl">
+        <h1 className="truncate font-display text-2xl font-extrabold text-slate-900 sm:text-3xl">
           {firstName} <span aria-hidden="true">👋</span>
         </h1>
       </div>
+      <Link href="/student/profile" aria-label="Your profile" className="rounded-full md:hidden">
+        <InitialsAvatar name={name} />
+      </Link>
+    </div>
+  );
+
+  /* ---------- New student: not enrolled in anything yet ---------- */
+  if (courses.length === 0) {
+    return (
+      <PageContainer className="space-y-6 sm:space-y-8">
+        {header}
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="min-w-0 space-y-6">
+            <section className={heroClass}>
+              <HeroDecor />
+              <span className="relative inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
+                <Sparkles className="h-3.5 w-3.5" aria-hidden="true" /> Welcome to TAXBROS
+              </span>
+              <h2 className="relative mt-3 font-display text-xl font-extrabold leading-tight sm:text-2xl">Your courses will appear here</h2>
+              <p className="relative mt-1.5 max-w-lg text-sm text-white/80 sm:text-base">
+                The institute enrols you in courses after admission. Until then, the practice labs are open: try filing a GST
+                return with sample data.
+              </p>
+              <div className="relative mt-5 flex flex-wrap gap-2.5">
+                <Link href="/student/labs" className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-brand-strong shadow-sm hover:bg-brand-soft">
+                  <FlaskConical className="h-4 w-4" aria-hidden="true" /> Open practice labs
+                </Link>
+                <Link href="/student/profile" className="inline-flex h-11 items-center rounded-xl bg-white/15 px-4 text-sm font-semibold hover:bg-white/25">
+                  View my profile
+                </Link>
+              </div>
+            </section>
+
+            <section className="rounded-[1.25rem] border bg-white p-5 shadow-sm">
+              <div className="flex items-baseline justify-between">
+                <h2 className="text-base font-bold text-slate-900 sm:text-lg">Getting started</h2>
+                <span className="text-xs text-slate-500">1 of 3 done</span>
+              </div>
+              <ol className="mt-2 divide-y">
+                <li className="flex items-start gap-3.5 py-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand text-white">
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-900">Your account is ready</span>
+                    <span className="block text-xs text-slate-500 sm:text-sm">You can sign in on any phone or computer.</span>
+                  </span>
+                </li>
+                <li className="flex items-start gap-3.5 py-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-orange-50 text-sm font-bold text-orange-700 ring-2 ring-inset ring-orange-200">
+                    2
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-slate-900">Get enrolled in a course</span>
+                    <span className="block text-xs text-slate-500 sm:text-sm">Your institute administrator adds you to your batch&apos;s courses.</span>
+                  </span>
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-orange-50 px-2.5 py-1 text-xs font-semibold text-orange-700">
+                    <Hourglass className="h-3.5 w-3.5" aria-hidden="true" /> Waiting
+                  </span>
+                </li>
+                <li className="flex items-start gap-3.5 py-3.5">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-bold text-slate-400">3</span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-500">Watch your first lesson</span>
+                    <span className="block text-xs text-slate-500 sm:text-sm">Lessons, tests and your progress show up here.</span>
+                  </span>
+                </li>
+              </ol>
+            </section>
+
+            <section>
+              <SectionHeading title="Practise while you wait" href="/student/labs" linkLabel="All labs" />
+              <LabShortcuts />
+            </section>
+          </div>
+
+          <aside className="min-w-0 space-y-6">
+            <section className="rounded-[1.25rem] border bg-white p-5 shadow-sm">
+              <SectionHeading title="This Week's Focus" icon={Target} />
+              <QuietNote icon={BookOpen} title="No lessons scheduled">
+                Your weekly plan starts once you are enrolled in a course.
+              </QuietNote>
+            </section>
+            <section className="rounded-[1.25rem] border bg-white p-5 shadow-sm">
+              <SectionHeading title="Tests & Exams" icon={ClipboardCheck} />
+              <QuietNote icon={ClipboardCheck} title="No tests yet">
+                Tests from your courses will be listed here.
+              </QuietNote>
+            </section>
+          </aside>
+        </div>
+      </PageContainer>
+    );
+  }
+
+  /* ---------- Enrolled ---------- */
+  const tiles = [
+    { href: '/student/courses', icon: BookOpen, title: 'My Courses', text: `${courses.length} Enrolled`, tone: 'bg-brand-soft text-brand-strong' },
+    { href: '/student/labs', icon: FlaskConical, title: 'Practice Labs', text: 'GST · ITR · MCA', tone: 'bg-orange-50 text-flame' },
+    {
+      href: '/student/quizzes',
+      icon: ClipboardCheck,
+      title: 'Tests & Exams',
+      text: quizzes.length === 0 ? 'None yet' : `${pendingQuizzes.length} Pending`,
+      tone: 'bg-rose-50 text-rose-500',
+    },
+    {
+      href: '/student/performance',
+      icon: ChartColumn,
+      title: 'My Performance',
+      text: average === undefined ? `${completedCount} completed` : `${average}% test average`,
+      tone: 'bg-indigo-50 text-indigo-600',
+    },
+  ];
+
+  let hero;
+  if (current) {
+    hero = (
+      <section className={heroClass}>
+        <HeroDecor />
+        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-strong">
+          <Play className="h-3 w-3 fill-current" aria-hidden="true" /> Continue Learning
+        </span>
+        <h2 className="relative mt-3 line-clamp-2 font-display text-xl font-extrabold leading-tight sm:text-2xl">
+          {current.courseTitle}
+          {currentModule && ` – Module ${currentModule.number}`}
+        </h2>
+        <p className="relative mt-1 line-clamp-1 text-sm text-white/80">
+          {currentModule ? currentModule.title : `${current.completedLessons} of ${current.totalLessons} lessons done`}
+        </p>
+        {currentNext && (
+          <p className="relative mt-0.5 line-clamp-1 text-xs text-white/60">
+            Next: {currentNext.kind === 'quiz' ? `Quiz – ${currentNext.title}` : currentNext.title}
+          </p>
+        )}
+        <div className="relative mt-5 flex items-end gap-4">
+          <div className="min-w-0 flex-1">
+            <ProgressBar value={current.progressPercentage} tone="light" className="h-2" />
+            <p className="mt-2 text-sm font-semibold text-white/90">{current.progressPercentage}% Completed</p>
+          </div>
+          <Link
+            href={currentNext ? currentNext.href : `/student/courses/${current.courseId}`}
+            aria-label={`Continue ${current.courseTitle}`}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand-strong shadow-md transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
+          >
+            <Play className="h-5 w-5 fill-current" />
+          </Link>
+        </div>
+      </section>
+    );
+  } else if (waiting.length > 0) {
+    const course = waiting[0];
+    hero = (
+      <section className={heroClass}>
+        <HeroDecor />
+        <ComingSoonPill className="relative" />
+        <h2 className="relative mt-3 line-clamp-2 font-display text-xl font-extrabold leading-tight sm:text-2xl">{course.courseTitle}</h2>
+        <p className="relative mt-1.5 max-w-lg text-sm text-white/80 sm:text-base">
+          You are enrolled. Your instructor is still preparing the lessons, and they will appear here as soon as they are published.
+        </p>
+        <div className="relative mt-5 flex flex-wrap gap-2.5">
+          <Link href={`/student/courses/${course.courseId}`} className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-brand-strong shadow-sm hover:bg-brand-soft">
+            View course <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+          <Link href="/student/labs" className="inline-flex h-11 items-center gap-2 rounded-xl bg-white/15 px-4 text-sm font-semibold hover:bg-white/25">
+            <FlaskConical className="h-4 w-4" aria-hidden="true" /> Practise in a lab
+          </Link>
+        </div>
+      </section>
+    );
+  } else {
+    hero = (
+      <section className={heroClass}>
+        <HeroDecor />
+        <span className="relative inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
+          <Trophy className="h-3.5 w-3.5" aria-hidden="true" /> All caught up
+        </span>
+        <h2 className="relative mt-3 font-display text-xl font-extrabold leading-tight sm:text-2xl">You have finished every lesson</h2>
+        <p className="relative mt-1.5 max-w-lg text-sm text-white/80 sm:text-base">Review a course, retake a test, or keep your skills sharp in the practice labs.</p>
+        <div className="relative mt-5 flex flex-wrap gap-2.5">
+          <Link href="/student/courses" className="inline-flex h-11 items-center gap-2 rounded-xl bg-white px-4 text-sm font-semibold text-brand-strong shadow-sm hover:bg-brand-soft">
+            Review courses <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <PageContainer className="space-y-6 sm:space-y-8">
+      {header}
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] xl:grid-cols-[minmax(0,1fr)_24rem]">
         <div className="min-w-0 space-y-6">
-          {/* Continue learning */}
-          {current ? (
-            <section className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-brand-strong via-[#135d6e] to-brand p-5 text-white shadow-lg sm:p-7">
-              <div className="pointer-events-none absolute -right-10 -top-16 h-48 w-48 rounded-full bg-white/10" aria-hidden="true" />
-              <div className="pointer-events-none absolute -bottom-20 right-24 h-40 w-40 rounded-full bg-white/5" aria-hidden="true" />
-              <span className="relative inline-flex items-center gap-1.5 rounded-full bg-brand-soft px-2.5 py-1 text-[11px] font-semibold text-brand-strong">
-                <Play className="h-3 w-3 fill-current" aria-hidden="true" /> Continue Learning
-              </span>
-              <h2 className="relative mt-3 text-xl font-bold leading-tight sm:text-2xl">{current.courseTitle}</h2>
-              <p className="relative mt-1 line-clamp-1 text-sm text-white/75">
-                {currentNext
-                  ? `${currentNext.moduleTitle} · ${currentNext.lessonTitle}`
-                  : `${current.completedLessons} of ${current.totalLessons} lessons done`}
-              </p>
-              <div className="relative mt-5 flex items-end gap-4">
-                <div className="min-w-0 flex-1">
-                  <ProgressBar value={current.progressPercentage} tone="light" className="h-2" />
-                  <p className="mt-2 text-sm font-medium text-white/90">{current.progressPercentage}% completed</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleContinueLearning(current.courseId)}
-                  aria-label={`Continue ${current.courseTitle}`}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white text-brand-strong shadow-md transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white"
-                >
-                  <Play className="h-5 w-5 fill-current" />
-                </button>
-              </div>
-            </section>
-          ) : (
-            <section className="rounded-3xl border border-dashed bg-white p-8 text-center">
-              <BookOpen className="mx-auto h-10 w-10 text-slate-300" aria-hidden="true" />
-              <p className="mt-3 font-semibold text-slate-800">
-                {activeCourses.length === 0 ? 'No active courses yet' : 'All caught up!'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                {activeCourses.length === 0
-                  ? 'Ask your administrator to enrol you in a course.'
-                  : 'You have finished every lesson in your courses.'}
-              </p>
-            </section>
-          )}
+          {hero}
 
-          {/* Quick tiles */}
           <section aria-label="Shortcuts" className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4">
             {tiles.map(({ href, icon: Icon, title, text, tone }) => (
               <Link
                 key={title}
                 href={href}
-                className="rounded-2xl border bg-white p-4 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                className="rounded-[1.25rem] border bg-white p-4 shadow-sm transition-shadow hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
               >
                 <span className={cn('flex h-10 w-10 items-center justify-center rounded-xl', tone)}>
                   <Icon className="h-5 w-5" aria-hidden="true" />
                 </span>
-                <p className="mt-3 text-sm font-bold text-slate-900">{title}</p>
-                <p className="mt-0.5 text-xs text-slate-500">{text}</p>
+                <p className="mt-3 text-[15px] font-bold text-slate-900">{title}</p>
+                <p className="mt-0.5 text-xs text-slate-500 sm:text-[13px]">{text}</p>
               </Link>
             ))}
           </section>
 
-          {/* Courses */}
-          {activeCourses.length > 0 && (
+          {/* Phones follow the mobile design (focus list under the shortcuts); larger screens show it in the side column */}
+          <FocusCard focus={focus} nothingPublished={nothingPublished} className="lg:hidden" />
+
+          <section className="hidden sm:block">
+            <SectionHeading title="My Courses" href="/student/courses" />
+            <div className="grid gap-4 sm:grid-cols-2">
+              {courses.slice(0, 4).map((course) => (
+                <CourseProgressCard key={course.enrollmentId} course={course} href={`/student/courses/${course.courseId}`} />
+              ))}
+            </div>
+          </section>
+
+          {!current && waiting.length > 0 && (
             <section>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">My Courses</h2>
-                <Link href="/student/courses" className="text-sm font-semibold text-brand hover:underline">
-                  View all
-                </Link>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                {activeCourses.slice(0, 4).map((course) => (
-                  <CourseProgressCard key={course.enrollmentId} course={course} href={`/student/courses/${course.courseId}`} />
-                ))}
-              </div>
+              <SectionHeading title="Practise while you wait" href="/student/labs" linkLabel="All labs" />
+              <LabShortcuts />
             </section>
           )}
         </div>
 
-        <aside className="min-w-0 space-y-6">
-          {/* This week's focus */}
-          <section className="rounded-2xl border bg-white p-5 shadow-sm">
-            <div className="mb-3 flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-soft text-brand-strong">
-                <Target className="h-4 w-4" aria-hidden="true" />
-              </span>
-              <h2 className="text-base font-bold text-slate-900">This Week&apos;s Focus</h2>
-            </div>
-            {focus.length === 0 ? (
-              <p className="py-4 text-sm text-slate-500">Nothing pending. Great work!</p>
+        <aside className="hidden min-w-0 space-y-6 lg:block">
+          <FocusCard focus={focus} nothingPublished={nothingPublished} />
+          <section className="rounded-[1.25rem] border bg-white p-5 shadow-sm">
+            <SectionHeading title="Tests & Exams" href={quizzes.length > 0 ? '/student/quizzes' : undefined} />
+            {quizzes.length === 0 ? (
+              <QuietNote icon={ClipboardCheck} title="No tests yet">
+                Tests appear when your instructor publishes them.
+              </QuietNote>
             ) : (
-              <ul className="divide-y">
-                {focus.map((f) => (
-                  <li key={f.key}>
-                    <Link
-                      href={f.href}
-                      className="group flex items-start gap-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                    >
-                      {f.done ? (
-                        <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-brand" aria-label="Done" />
-                      ) : (
-                        <Circle className="mt-0.5 h-5 w-5 shrink-0 text-slate-300" aria-label="To do" />
-                      )}
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={cn(
-                            'block text-sm font-medium text-slate-800 group-hover:text-brand-strong',
-                            f.done && 'text-slate-400 line-through',
-                          )}
-                        >
-                          {f.label}
-                        </span>
-                        {f.hint && <span className="block truncate text-xs text-slate-500">{f.hint}</span>}
-                      </span>
-                      <ChevronRight className="mt-0.5 h-4 w-4 shrink-0 text-slate-300" aria-hidden="true" />
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          {/* Quizzes */}
-          <section id="quizzes" className="scroll-mt-24 rounded-2xl border bg-white p-5 shadow-sm">
-            <h2 className="mb-3 text-base font-bold text-slate-900">Tests &amp; Quizzes</h2>
-            {availableQuizzes.length === 0 ? (
-              <p className="py-4 text-sm text-slate-500">No quizzes available yet.</p>
-            ) : (
-              <ul className="space-y-3">
-                {availableQuizzes.map((quiz) => (
+              <ul className="space-y-2.5">
+                {quizzes.slice(0, 4).map((quiz) => (
                   <li key={quiz.id}>
                     <Link
                       href={`/student/quizzes/${quiz.id}`}
-                      className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                      className="flex items-center gap-3 rounded-xl border p-3 transition-colors hover:border-brand/40 hover:bg-brand-soft/30"
                     >
-                      <span
-                        className={cn(
-                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl',
-                          quiz.bestAttemptPassed ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500',
-                        )}
-                      >
-                        {quiz.bestAttemptPassed ? <Trophy className="h-5 w-5" /> : <ClipboardCheck className="h-5 w-5" />}
+                      <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', quiz.passed ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-500')}>
+                        {quiz.passed ? <Trophy className="h-4 w-4" /> : <ClipboardCheck className="h-4 w-4" />}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-slate-900">{quiz.title}</span>
-                        <span className="flex flex-wrap items-center gap-x-2 text-xs text-slate-500">
-                          <span>{quiz.totalMarks} marks</span>
-                          {quiz.timeLimit && (
-                            <span className="inline-flex items-center gap-0.5">
-                              <Clock className="h-3 w-3" aria-hidden="true" /> {quiz.timeLimit} min
-                            </span>
-                          )}
-                          {quiz.attemptCount > 0 && (
-                            <span>
-                              Best {quiz.bestScore}/{quiz.totalMarks}
-                            </span>
-                          )}
-                        </span>
+                        <span className="block truncate text-xs text-slate-500">{quiz.courseTitle}</span>
                       </span>
-                      <span
-                        className={cn(
-                          'shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold',
-                          quiz.bestAttemptPassed
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : quiz.attemptCount > 0
-                              ? 'bg-amber-50 text-amber-700'
-                              : 'bg-brand-soft text-brand-strong',
-                        )}
-                      >
-                        {quiz.bestAttemptPassed ? 'Passed' : quiz.attemptCount > 0 ? 'Retake' : 'Start'}
-                      </span>
+                      <span className="text-xs font-semibold text-brand-strong">{quiz.passed ? 'Passed' : quiz.attemptCount > 0 ? 'Retake' : 'Start'}</span>
                     </Link>
                   </li>
                 ))}
@@ -437,5 +384,57 @@ export default function StudentDashboardPage() {
         </aside>
       </div>
     </PageContainer>
+  );
+}
+
+interface FocusItem {
+  key: string;
+  label: string;
+  hint: string;
+  href: string;
+  done: boolean;
+}
+
+/** "This Week's Focus" checklist; honest wording when there is nothing to do yet. */
+function FocusCard({ focus, nothingPublished, className }: { focus: FocusItem[]; nothingPublished: boolean; className?: string }) {
+  return (
+    <section className={cn('rounded-[1.25rem] border bg-white p-5 shadow-sm', className)}>
+      <SectionHeading title="This Week's Focus" icon={Target} href={focus.length > 0 ? '/student/courses' : undefined} />
+      {focus.length === 0 ? (
+        nothingPublished ? (
+          <QuietNote icon={Clock} title="Nothing to watch yet">
+            Your next lessons will be listed here once your course has some.
+          </QuietNote>
+        ) : (
+          <QuietNote icon={Trophy} title="All caught up">
+            You have no lessons or tests waiting this week.
+          </QuietNote>
+        )
+      ) : (
+        <ul className="space-y-0.5">
+          {focus.map((f) => (
+            <li key={f.key}>
+              <Link href={f.href} className="group flex items-start gap-3 rounded-lg py-2.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand">
+                <span
+                  className={cn(
+                    'mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2',
+                    f.done ? 'border-brand bg-brand text-white' : 'border-slate-300 bg-white',
+                  )}
+                  aria-label={f.done ? 'Done' : 'To do'}
+                >
+                  {f.done && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className={cn('block text-sm font-medium text-slate-800 group-hover:text-brand-strong', f.done && 'text-slate-400 line-through')}>
+                    {f.label}
+                  </span>
+                  {f.hint && <span className="block truncate text-xs text-slate-500">{f.hint}</span>}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

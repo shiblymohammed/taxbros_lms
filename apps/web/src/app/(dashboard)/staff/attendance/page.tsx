@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
 import { AttendanceLegend, RemarksInput, StatusPicker, sameEntry } from "@/components/features/attendance/status-picker"
+import { ClassCheckIn } from "@/components/features/attendance/class-check-in"
 import { changedMarks, entriesFromRegister, type EntryMap } from "@/lib/attendance-register"
 import {
   AttendanceStatus,
@@ -165,6 +166,20 @@ export default function ClassRegisterPage() {
 
   const selectedClass = classes.find((c) => c.id === classId)
 
+  // After student self check-in: show the marks students made (unless there are unsaved edits here)
+  const handleSelfCheckInChange = async (updated?: AttendanceRegister) => {
+    if (updated) {
+      applyRegister(updated)
+      return
+    }
+    if (!register || pending.length > 0) return
+    try {
+      applyRegister(await registersApi.open(register.classId, date))
+    } catch {
+      // The register on screen stays as it was
+    }
+  }
+
   return (
     <div className="container mx-auto max-w-7xl px-4 py-6 sm:py-8">
       <Card>
@@ -257,6 +272,7 @@ export default function ClassRegisterPage() {
                 </span>
                 {register.className} · {format(new Date(`${date}T00:00:00`), "EEEE d MMMM yyyy")} · roster fixed when first opened
               </p>
+              <ClassCheckIn register={register} isToday={date === today} onRegisterChanged={handleSelfCheckInChange} />
               <ul className="divide-y rounded-lg border">
                 {students.map((student, index) => {
                   const entry = entries[student.studentId]

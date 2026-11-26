@@ -32,8 +32,9 @@ describe('staff access to admin screens (R3)', () => {
   });
 
   it('builds the staff menu from the permissions', () => {
-    expect(staffNav([]).map((n) => n.label)).toEqual(['Class Register']);
+    expect(staffNav([]).map((n) => n.label)).toEqual(['My Attendance', 'Class Register']);
     expect(staffNav(['MANAGE_COURSES', 'MANAGE_STUDENTS']).map((n) => n.label)).toEqual([
+      'My Attendance',
       'Class Register',
       'Users',
       'Courses',

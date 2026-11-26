@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { BookOpen, CheckCircle2, ChevronRight, FlaskConical, KeyRound, Loader2, LogOut, Trophy } from 'lucide-react';
+import { BookOpen, ChartColumn, CheckCircle2, ChevronRight, ClipboardCheck, FlaskConical, KeyRound, Loader2, LogOut, Trophy } from 'lucide-react';
 import { ProgressBar } from '@/components/features/courses/course-progress-card';
 import { PageContainer } from '@/components/layout/page-header';
 import { useStudentProgress } from '@/hooks/use-student-progress';
@@ -80,7 +80,9 @@ export default function StudentProfilePage() {
         <h2 className="px-5 pb-2 pt-4 text-sm font-semibold uppercase tracking-wide text-slate-400">Account</h2>
         <ul className="divide-y">
           {[
+            { href: '/student/performance', icon: ChartColumn, label: 'My Performance' },
             { href: '/student/courses', icon: BookOpen, label: 'My Courses' },
+            { href: '/student/quizzes', icon: ClipboardCheck, label: 'Tests & Exams' },
             { href: '/student/labs', icon: FlaskConical, label: 'Practice Labs' },
             { href: '/change-password', icon: KeyRound, label: 'Change password' },
           ].map(({ href, icon: Icon, label }) => (

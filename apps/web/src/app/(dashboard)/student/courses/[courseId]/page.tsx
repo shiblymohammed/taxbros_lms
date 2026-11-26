@@ -1,39 +1,22 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { useParams } from 'next/navigation';
+import { ArrowLeft, Bell, BookOpen, CheckCircle2, ClipboardCheck, Layers, Loader2, Play, Trophy } from 'lucide-react';
+import { ProgressBar } from '@/components/features/courses/course-progress-card';
+import { ModuleContent, OutlinePlaceholder } from '@/components/features/student/module-content';
+import { ComingSoonPill, EmptyState, LabShortcuts, SectionHeading } from '@/components/features/student/student-ui';
+import { PageContainer } from '@/components/layout/page-header';
+import { groupByModule, nextStep, type CourseLesson, type CourseQuiz } from '@/hooks/use-student-overview';
 import { apiClient } from '@/lib/api';
-import { CheckCircle2, Circle, PlayCircle, ArrowLeft, Loader2 } from 'lucide-react';
-
-interface Lesson {
-  lessonId: string;
-  lessonTitle: string;
-  moduleTitle: string;
-  displayOrder: number;
-  duration: number | null;
-  status: 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED';
-  lastPosition: number;
-  watchedDuration: number;
-  completedAt: string | null;
-}
-
-interface Module {
-  id: string;
-  title: string;
-  description?: string;
-  displayOrder: number;
-  lessons: Lesson[];
-}
 
 interface Course {
   id: string;
   title: string;
   description?: string;
   coverImage?: string;
-  status: string;
 }
 
 interface CourseProgress {
@@ -41,288 +24,170 @@ interface CourseProgress {
   courseTitle: string;
   enrollmentStatus: 'ACTIVE' | 'COMPLETED' | 'DROPPED';
   progressPercentage: number;
-  lessons: Lesson[];
+  lessons: CourseLesson[];
+  quizzes?: CourseQuiz[];
 }
 
+/** One enrolled course: header with progress, then the module outline (or "lessons coming soon"). */
 export default function StudentCoursePage() {
   const params = useParams();
-  const router = useRouter();
   const courseId = params?.courseId as string;
-  
   const [course, setCourse] = useState<Course | null>(null);
   const [progress, setProgress] = useState<CourseProgress | null>(null);
-  const [modules, setModules] = useState<Module[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!courseId) return;
-    
-    const fetchCourseData = async () => {
+    let cancelled = false;
+    (async () => {
       try {
-        setLoading(true);
-        setError(null);
-
-        // Fetch course details
-        const courseResponse = await apiClient.get(`/courses/${courseId}`);
-        setCourse(courseResponse.data);
-
-        // Fetch course progress
-        const progressResponse = await apiClient.get(`/courses/${courseId}/progress`);
-        setProgress(progressResponse.data);
-
-        // Organize lessons by module
-        const lessonsByModule = new Map<string, Lesson[]>();
-        progressResponse.data.lessons.forEach((lesson: Lesson) => {
-          if (!lessonsByModule.has(lesson.moduleTitle)) {
-            lessonsByModule.set(lesson.moduleTitle, []);
-          }
-          lessonsByModule.get(lesson.moduleTitle)!.push(lesson);
-        });
-
-        // Create module structure
-        const moduleList: Module[] = [];
-        let moduleOrder = 0;
-        lessonsByModule.forEach((lessons, moduleTitle) => {
-          // Sort lessons by display order
-          lessons.sort((a, b) => a.displayOrder - b.displayOrder);
-          
-          moduleList.push({
-            id: `module-${moduleOrder}`,
-            title: moduleTitle,
-            displayOrder: moduleOrder,
-            lessons: lessons,
-          });
-          moduleOrder++;
-        });
-
-        // Sort modules (assuming first lesson's order indicates module order)
-        moduleList.sort((a, b) => {
-          const aFirstLesson = a.lessons[0]?.displayOrder || 0;
-          const bFirstLesson = b.lessons[0]?.displayOrder || 0;
-          return aFirstLesson - bFirstLesson;
-        });
-
-        setModules(moduleList);
-      } catch (err: any) {
-        console.error('Error fetching course data:', err);
-        setError(err.response?.data?.message || 'Failed to load course data');
+        const [c, p] = await Promise.all([
+          apiClient.get<Course>(`/courses/${courseId}`),
+          apiClient.get<CourseProgress>(`/courses/${courseId}/progress`),
+        ]);
+        if (!cancelled) {
+          setCourse(c.data);
+          setProgress(p.data);
+        }
+      } catch (err) {
+        const message = (err as { response?: { data?: { message?: string } } }).response?.data?.message;
+        if (!cancelled) setError(message || 'We could not load this course.');
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
+    })();
+    return () => {
+      cancelled = true;
     };
-
-    fetchCourseData();
   }, [courseId]);
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />;
-      case 'IN_PROGRESS':
-        return <PlayCircle className="h-5 w-5 text-brand" />;
-      case 'NOT_STARTED':
-      default:
-        return <Circle className="h-5 w-5 text-gray-400" />;
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'COMPLETED':
-        return 'Completed';
-      case 'IN_PROGRESS':
-        return 'In Progress';
-      case 'NOT_STARTED':
-      default:
-        return 'Not Started';
-    }
-  };
-
-  const formatDuration = (seconds: number | null) => {
-    if (!seconds) return 'Duration not set';
-    
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = seconds % 60;
-    
-    if (minutes < 60) {
-      return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    }
-    
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  };
-
-  const handleLessonClick = (lessonId: string) => {
-    router.push(`/student/courses/${courseId}/lessons/${lessonId}`);
-  };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-500" />
+      <div className="flex min-h-[60vh] items-center justify-center" role="status">
+        <Loader2 className="h-8 w-8 animate-spin text-brand" />
+        <span className="sr-only">Loading course…</span>
       </div>
     );
   }
 
-  if (error) {
+  if (error || !course || !progress) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-red-600 text-lg">{error}</p>
-        <Button onClick={() => router.back()}>Go Back</Button>
-      </div>
+      <PageContainer className="max-w-3xl">
+        <EmptyState
+          icon={BookOpen}
+          title="Course not available"
+          actions={
+            <Link href="/student/courses" className="inline-flex h-11 items-center rounded-xl bg-brand-strong px-5 text-sm font-semibold text-white hover:bg-brand">
+              Back to My Courses
+            </Link>
+          }
+        >
+          {error || 'This course could not be found.'} If you think you should have access, ask the institute office.
+        </EmptyState>
+      </PageContainer>
     );
   }
 
-  if (!course || !progress) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-        <p className="text-gray-600 text-lg">Course not found</p>
-        <Button onClick={() => router.push('/student/dashboard')}>Back to Dashboard</Button>
-      </div>
-    );
-  }
+  const lessons = progress.lessons ?? [];
+  const empty = lessons.length === 0;
+  const modules = groupByModule(lessons);
+  const doneCount = lessons.filter((l) => l.status === 'COMPLETED').length;
+  const quizzes = progress.quizzes ?? [];
+  const next = nextStep(courseId, lessons, quizzes);
+  const finished = !empty && !next;
 
   return (
-    <div>
-      <div className="max-w-7xl mx-auto p-6">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          onClick={() => router.push('/student/dashboard')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Button>
+    <PageContainer className="max-w-5xl space-y-5">
+      <Link href="/student/courses" className="hidden items-center gap-2 text-sm font-medium text-slate-500 hover:text-slate-900 md:inline-flex">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" /> My Courses
+      </Link>
 
-        {/* Course Header */}
-        <Card className="mb-6">
-          <CardHeader>
-            <div className="flex flex-col md:flex-row gap-6">
-              {/* Cover Image */}
-              {course.coverImage && (
-                <div className="relative w-full md:w-48 h-48 rounded-lg overflow-hidden flex-shrink-0">
-                  <Image
-                    src={course.coverImage}
-                    alt={course.title}
-                    fill
-                    sizes="(min-width: 768px) 12rem, 100vw"
-                    className="object-cover"
-                  />
-                </div>
-              )}
-              
-              {/* Course Info */}
-              <div className="flex-1">
-                <CardTitle className="text-3xl mb-2">{course.title}</CardTitle>
-                {course.description && (
-                  <CardDescription className="text-base mb-4">
-                    {course.description}
-                  </CardDescription>
-                )}
-                
-                {/* Progress Bar */}
-                <div className="mt-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-700">
-                      Course Progress
-                    </span>
-                    <span className="text-sm font-semibold text-gray-900">
-                      {progress.progressPercentage}%
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div
-                      className="bg-brand h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${progress.progressPercentage}%` }}
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardHeader>
-        </Card>
-
-        {/* Course Content - Modules and Lessons */}
-        <div className="space-y-6">
-          {modules.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-gray-500">
-                No published lessons available in this course yet.
-              </CardContent>
-            </Card>
+      <section className="overflow-hidden rounded-[1.6rem] border bg-white shadow-sm">
+        <div className="relative h-28 bg-gradient-to-br from-brand-strong via-[#135d6e] to-brand sm:h-36">
+          {course.coverImage ? (
+            <Image src={course.coverImage} alt="" fill sizes="(min-width: 1024px) 64rem, 100vw" className="object-cover" priority />
           ) : (
-            modules.map((module, moduleIndex) => (
-              <Card key={module.id}>
-                <CardHeader className="bg-gray-50 border-b">
-                  <CardTitle className="text-xl">
-                    Module {moduleIndex + 1}: {module.title}
-                  </CardTitle>
-                  {module.description && (
-                    <CardDescription>{module.description}</CardDescription>
-                  )}
-                </CardHeader>
-                <CardContent className="p-0">
-                  <div className="divide-y">
-                    {module.lessons.map((lesson, lessonIndex) => (
-                      <div
-                        key={lesson.lessonId}
-                        className="flex items-center justify-between gap-3 p-4 hover:bg-gray-50 transition-colors cursor-pointer"
-                        onClick={() => handleLessonClick(lesson.lessonId)}
-                      >
-                        <div className="flex min-w-0 flex-1 items-center gap-3 sm:gap-4">
-                          {/* Status Icon */}
-                          <div className="flex-shrink-0">
-                            {getStatusIcon(lesson.status)}
-                          </div>
-                          
-                          {/* Lesson Info */}
-                          <div className="flex-1 min-w-0">
-                            <h4 className="font-medium text-gray-900 truncate">
-                              Lesson {lessonIndex + 1}: {lesson.lessonTitle}
-                            </h4>
-                            <div className="flex items-center gap-4 mt-1">
-                              <span className="text-sm text-gray-500">
-                                {formatDuration(lesson.duration)}
-                              </span>
-                              <span
-                                className={`text-sm font-medium ${
-                                  lesson.status === 'COMPLETED'
-                                    ? 'text-green-600'
-                                    : lesson.status === 'IN_PROGRESS'
-                                    ? 'text-brand'
-                                    : 'text-gray-500'
-                                }`}
-                              >
-                                {getStatusText(lesson.status)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Action Button */}
-                        <Button
-                          variant={lesson.status === 'NOT_STARTED' ? 'default' : 'outline'}
-                          size="sm"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleLessonClick(lesson.lessonId);
-                          }}
-                        >
-                          {lesson.status === 'COMPLETED' ? 'Review' : 
-                           lesson.status === 'IN_PROGRESS' ? 'Continue' : 'Start'}
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+            <>
+              <span className="absolute -right-8 -top-12 h-40 w-40 rounded-full bg-white/10" aria-hidden="true" />
+              <BookOpen className="absolute right-6 top-6 h-12 w-12 text-white/20" aria-hidden="true" />
+            </>
           )}
         </div>
-      </div>
-    </div>
+        <div className="p-5 sm:p-7">
+          {empty ? (
+            <ComingSoonPill />
+          ) : finished ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+              <Trophy className="h-3.5 w-3.5" aria-hidden="true" /> Course completed
+            </span>
+          ) : null}
+          <h1 className="mt-2 font-display text-2xl font-extrabold leading-tight text-slate-900 sm:text-3xl">{course.title}</h1>
+          {course.description && <p className="mt-1.5 text-sm text-slate-500 sm:text-base">{course.description}</p>}
+          <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-500">
+            <span className="inline-flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              {empty ? 'No lessons published yet' : `${lessons.length} ${lessons.length === 1 ? 'lesson' : 'lessons'}`}
+            </span>
+            {!empty && (
+              <span className="inline-flex items-center gap-1.5">
+                <Layers className="h-4 w-4" aria-hidden="true" /> {modules.length} {modules.length === 1 ? 'module' : 'modules'}
+              </span>
+            )}
+            {!empty && (
+              <span className="inline-flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4" aria-hidden="true" /> {doneCount} done
+              </span>
+            )}
+          </div>
+          {!empty && next && (
+            <div className="mt-5">
+              <Link
+                href={next.href}
+                className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand-strong px-5 text-sm font-semibold text-white hover:bg-brand sm:w-auto"
+              >
+                {next.kind === 'quiz' ? (
+                  <>
+                    <ClipboardCheck className="h-4 w-4" aria-hidden="true" /> Take quiz: {next.title}
+                  </>
+                ) : (
+                  <>
+                    <Play className="h-4 w-4 fill-current" aria-hidden="true" />
+                    {doneCount === 0 && next.lesson.status === 'NOT_STARTED' ? 'Start course' : 'Continue learning'}
+                  </>
+                )}
+              </Link>
+              {next.kind === 'quiz' && <p className="mt-2 text-xs text-slate-500">Pass this quiz to unlock the next lesson.</p>}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {empty ? (
+        <>
+          <div className="flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3.5 text-sm text-amber-900">
+            <Bell className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true" />
+            <p>Lessons are being prepared. They will show here, in order, as soon as your instructor publishes them.</p>
+          </div>
+          <section className="rounded-[1.25rem] border bg-white p-5 shadow-sm">
+            <h2 className="text-base font-bold text-slate-400">Course outline</h2>
+            <OutlinePlaceholder />
+          </section>
+          <section>
+            <SectionHeading title="Practise meanwhile" href="/student/labs" linkLabel="All labs" />
+            <LabShortcuts />
+          </section>
+        </>
+      ) : (
+        <section className="rounded-[1.25rem] border bg-white p-4 shadow-sm sm:p-6">
+          <div className="mb-1 flex items-center justify-between gap-3 px-1">
+            <h2 className="text-base font-bold text-slate-900 sm:text-lg">Module Content</h2>
+            <span className="text-sm font-semibold text-slate-700">{progress.progressPercentage}%</span>
+          </div>
+          <ProgressBar value={progress.progressPercentage} className="mb-4 h-2" />
+          <ModuleContent courseId={courseId} lessons={lessons} quizzes={quizzes} />
+        </section>
+      )}
+    </PageContainer>
   );
 }

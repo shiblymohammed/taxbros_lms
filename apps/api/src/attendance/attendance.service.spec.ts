@@ -710,6 +710,7 @@ describe('AttendanceService', () => {
           remarks: 'Arrived late',
           markedBy: 'admin-1',
           markedAt: expect.any(Date),
+          source: 'MARKED',
         },
       });
 

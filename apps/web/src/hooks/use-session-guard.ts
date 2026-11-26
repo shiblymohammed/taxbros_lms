@@ -42,7 +42,8 @@ export function useSessionGuard({ roles, staffByPermission }: SessionGuardOption
       }
       if (cancelled) return;
       if (!current) {
-        router.replace(loginRedirectUrl(pathname));
+        // Keep the query (e.g. a class check-in code from a QR link) through sign-in
+        router.replace(loginRedirectUrl(pathname + window.location.search));
         return;
       }
       if (current.mustChangePassword) {

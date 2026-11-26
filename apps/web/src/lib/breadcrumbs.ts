@@ -31,10 +31,11 @@ const DETAIL_PAGES: DetailPage[] = [
     parent: ['/student/courses', '/student/dashboard'],
     trail: (m) => [{ label: 'Course', href: `/student/courses/${m[1]}` }, { label: 'Lesson' }],
   },
-  { pattern: /^\/student\/quizzes\/[^/]+$/, parent: '/student/dashboard', trail: () => [{ label: 'Quiz' }] },
+  { pattern: /^\/student\/quizzes\/[^/]+$/, parent: ['/student/quizzes', '/student/dashboard'], trail: () => [{ label: 'Quiz' }] },
+  { pattern: /^\/student\/performance$/, parent: '/student/profile', trail: () => [{ label: 'My Performance' }] },
   {
     pattern: /^\/student\/quizzes\/([^/]+)\/results\/[^/]+$/,
-    parent: '/student/dashboard',
+    parent: ['/student/quizzes', '/student/dashboard'],
     trail: (m) => [{ label: 'Quiz', href: `/student/quizzes/${m[1]}` }, { label: 'Results' }],
   },
   { pattern: /^\/student\/labs\/gst$/, parent: '/student/labs', trail: () => [{ label: 'GST registration' }] },

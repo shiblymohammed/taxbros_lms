@@ -4,6 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CourseAccessService } from '../progress/course-access.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { assertNoQuizAttempts, deleteAttachedQuizzes } from './attached-quizzes';
 import { recalculateCourseProgress } from './course-progress';
@@ -25,7 +26,12 @@ import { UpdateLessonDto } from './dto/update-lesson.dto';
  */
 @Injectable()
 export class LessonsService {
-  constructor(private readonly prisma: PrismaService) {}
+  /** Learning order (quiz gate); only needs the database client */
+  readonly access: CourseAccessService;
+
+  constructor(private readonly prisma: PrismaService) {
+    this.access = new CourseAccessService(prisma);
+  }
 
   /**
    * Validate YouTube URL format

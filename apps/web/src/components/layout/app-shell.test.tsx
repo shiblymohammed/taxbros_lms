@@ -53,11 +53,11 @@ describe('AppShell staff access to admin screens (R3)', () => {
     expect(JSON.parse(store.get('authUser')!).permissions).toEqual(['MANAGE_CLASSES']);
   });
 
-  it('sends staff back to the class register from a screen they lack permission for', async () => {
+  it('sends staff back to their home screen from a screen they lack permission for', async () => {
     pathname = '/admin/courses';
     render(adminArea);
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/attendance'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/check-in'));
     expect(screen.queryByText('screen content')).not.toBeInTheDocument();
   });
 
@@ -67,7 +67,7 @@ describe('AppShell staff access to admin screens (R3)', () => {
     pathname = '/admin/classes';
     render(adminArea);
 
-    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/attendance'));
+    await waitFor(() => expect(replace).toHaveBeenCalledWith('/staff/check-in'));
   });
 
   it('keeps the full admin menu for administrators', async () => {

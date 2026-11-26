@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { BookOpen, Loader2, Search } from 'lucide-react';
+import Link from 'next/link';
+import { BookOpen, FlaskConical, Hourglass, Loader2, Search, SearchX, X } from 'lucide-react';
 import { CourseProgressCard } from '@/components/features/courses/course-progress-card';
-import { PageContainer, PageHeader } from '@/components/layout/page-header';
+import { EmptyState, LabShortcuts, SectionHeading } from '@/components/features/student/student-ui';
+import { PageContainer } from '@/components/layout/page-header';
 import { filterCourses, useStudentProgress, type CourseFilter } from '@/hooks/use-student-progress';
 import { cn } from '@/lib/utils';
 
@@ -13,11 +15,12 @@ const FILTERS: Array<{ key: CourseFilter; label: string }> = [
   { key: 'completed', label: 'Completed' },
 ];
 
-/** My Courses: every enrolment with progress, filterable like the mobile design's tabs. */
+/** My Courses (TAXBROS mobile design): title with search, filter pills, course cards. */
 export default function MyCoursesPage() {
   const { progress, loading, error } = useStudentProgress();
   const [filter, setFilter] = useState<CourseFilter>('all');
   const [query, setQuery] = useState('');
+  const [searching, setSearching] = useState(false);
 
   if (loading) {
     return (
@@ -28,59 +31,103 @@ export default function MyCoursesPage() {
     );
   }
 
-  const courses = progress?.courses ?? [];
+  const courses = (progress?.courses ?? []).filter((c) => c.enrollmentStatus !== 'DROPPED');
   const shown = filterCourses(courses, filter, query);
 
   return (
     <PageContainer>
-      <PageHeader title="My Courses" description="Pick up where you left off, or review a finished course." />
+      <div className="mb-5 flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-extrabold text-slate-900 sm:text-[1.75rem]">My Courses</h1>
+          <p className="mt-1 hidden text-sm text-slate-500 sm:block">Pick up where you left off, or review a finished course.</p>
+        </div>
+        {courses.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              setSearching((s) => !s);
+              setQuery('');
+            }}
+            aria-label={searching ? 'Close search' : 'Search courses'}
+            aria-expanded={searching}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-slate-600 hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+          >
+            {searching ? <X className="h-5 w-5" /> : <Search className="h-5 w-5" />}
+          </button>
+        )}
+      </div>
 
       {error ? (
-        <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <p role="alert" className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           {error}
         </p>
+      ) : courses.length === 0 ? (
+        <>
+          <EmptyState
+            icon={BookOpen}
+            badge={Hourglass}
+            title="No courses yet"
+            actions={
+              <>
+                <Link href="/student/labs" className="inline-flex h-11 items-center gap-2 rounded-xl bg-brand-strong px-5 text-sm font-semibold text-white hover:bg-brand">
+                  <FlaskConical className="h-4 w-4" aria-hidden="true" /> Try a practice lab
+                </Link>
+                <Link href="/student/dashboard" className="inline-flex h-11 items-center rounded-xl border bg-white px-5 text-sm font-semibold text-brand-strong hover:bg-slate-50">
+                  Back to home
+                </Link>
+              </>
+            }
+          >
+            Courses appear here once the institute enrols you, usually soon after admission. If it has been more than a few days, ask
+            the office to check your enrolment.
+          </EmptyState>
+          <section className="mt-8">
+            <SectionHeading title="Open to every student" href="/student/labs" linkLabel="All labs" />
+            <LabShortcuts />
+          </section>
+        </>
       ) : (
         <>
-          <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div role="tablist" aria-label="Filter courses" className="flex gap-2 overflow-x-auto">
-              {FILTERS.map((f) => (
-                <button
-                  key={f.key}
-                  type="button"
-                  role="tab"
-                  aria-selected={filter === f.key}
-                  onClick={() => setFilter(f.key)}
-                  className={cn(
-                    'h-9 shrink-0 rounded-full px-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
-                    filter === f.key ? 'bg-brand text-white shadow-sm' : 'bg-white text-slate-600 ring-1 ring-border hover:bg-slate-50',
-                  )}
-                >
-                  {f.label}
-                </button>
-              ))}
-            </div>
-            <label className="relative block sm:w-72">
+          {searching && (
+            <label className="relative mb-4 block">
               <span className="sr-only">Search your courses</span>
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
               <input
+                autoFocus
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search courses"
-                className="h-10 w-full rounded-full border bg-white pl-9 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20"
+                placeholder="Search your courses"
+                className="h-11 w-full rounded-full border bg-white pl-10 pr-4 text-sm outline-none focus:border-brand focus:ring-2 focus:ring-brand/20 sm:max-w-md"
               />
             </label>
+          )}
+
+          <div role="tablist" aria-label="Filter courses" className="-mx-4 mb-5 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0">
+            {FILTERS.map((f) => (
+              <button
+                key={f.key}
+                type="button"
+                role="tab"
+                aria-selected={filter === f.key}
+                onClick={() => setFilter(f.key)}
+                className={cn(
+                  'h-10 shrink-0 rounded-full px-4 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand',
+                  filter === f.key ? 'bg-brand text-white shadow-sm' : 'bg-white text-slate-600 ring-1 ring-border hover:bg-slate-50',
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
           </div>
 
           {shown.length === 0 ? (
-            <div className="rounded-2xl border border-dashed bg-white px-6 py-14 text-center">
-              <BookOpen className="mx-auto h-10 w-10 text-slate-300" aria-hidden="true" />
-              <p className="mt-3 font-semibold text-slate-800">
-                {courses.length === 0 ? 'You are not enrolled in any course yet' : 'No courses match'}
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                {courses.length === 0 ? 'Ask your administrator to enrol you.' : 'Try another filter or search.'}
-              </p>
-            </div>
+            <EmptyState icon={SearchX} title={query ? 'No courses match your search' : filter === 'completed' ? 'No completed courses yet' : 'Nothing in progress'}>
+              {query
+                ? 'Check the spelling, or clear the search to see all your courses.'
+                : filter === 'completed'
+                  ? 'Finish every lesson in a course and it moves here.'
+                  : 'Every course you are enrolled in is finished. Great work!'}
+            </EmptyState>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {shown.map((course) => (

@@ -1,83 +1,115 @@
 import Image from 'next/image';
-import { BookOpen, CalendarCheck, FlaskConical } from 'lucide-react';
 
-const HIGHLIGHTS = [
-  { icon: BookOpen, title: 'Video courses', text: 'Lessons, progress tracking and quizzes in one place.' },
-  { icon: CalendarCheck, title: 'Daily attendance', text: 'Class registers and staff attendance with monthly reports.' },
-  { icon: FlaskConical, title: 'Practice labs', text: 'Safe GST, income tax and MCA filing simulations.' },
-];
-
-function Brand({ large = false }: { large?: boolean }) {
+function Brand({ compact = false }: { compact?: boolean }) {
   return (
-    <div className={large ? 'flex flex-col items-center text-center' : 'flex items-center gap-3'}>
+    <div className="flex items-center gap-3">
       <Image
         src="/logo-mark.webp"
         unoptimized
         alt=""
-        width={large ? 72 : 44}
-        height={large ? 65 : 40}
+        width={44}
+        height={40}
         priority
-        className={large ? 'h-16 w-auto' : 'h-10 w-auto'}
+        className={compact ? 'h-9 w-auto' : 'h-10 w-auto'}
       />
-      <span className={large ? 'mt-3' : ''}>
-        <span className={`block font-display font-extrabold tracking-wide text-white ${large ? 'text-3xl' : 'text-xl'}`}>TAXBROS</span>
-        <span className="block text-[11px] font-medium uppercase tracking-[0.3em] text-white/70">by Acharya Institute</span>
+      <span className="leading-tight">
+        <span className="block font-display text-xl font-extrabold tracking-wide text-white">TAXBROS</span>
+        <span className="block text-xs text-white/65">by Acharya Institute</span>
       </span>
     </div>
   );
 }
 
-/** Sign-in and password screens: teal brand panel (top on phones, left on desktop) with the form. */
+const SLIP_ROWS = [
+  { label: 'Outward taxable supplies', value: '4,82,000' },
+  { label: 'Integrated tax', value: '86,760' },
+  { label: 'Input tax credit claimed', value: '61,240' },
+  { label: 'Net tax payable', value: '25,520', total: true },
+];
+
+/** A practice GST return, drawn as a paper slip: the one illustrative element on the sign-in screens. */
+function FilingSlip() {
+  return (
+    <figure
+      aria-hidden="true"
+      className="relative w-full max-w-sm rounded-md bg-white px-6 pb-6 pt-5 text-slate-800 shadow-[0_18px_40px_-12px_rgba(3,25,31,0.55)] motion-safe:animate-[slip-in_700ms_cubic-bezier(0.2,0.8,0.2,1)_200ms_both]"
+    >
+      <div className="flex items-baseline justify-between border-b border-dashed border-slate-300 pb-3">
+        <span className="font-display text-base font-bold text-brand-strong">GSTR-3B</span>
+        <span className="text-xs text-slate-500">Practice lab, October</span>
+      </div>
+      <dl className="mt-3 space-y-2 text-sm">
+        {SLIP_ROWS.map((row) => (
+          <div
+            key={row.label}
+            className={`flex justify-between gap-4 ${row.total ? 'mt-3 border-t border-slate-200 pt-3 font-semibold text-slate-900' : ''}`}
+          >
+            <dt>{row.label}</dt>
+            <dd className="tabular-nums">₹{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <span className="absolute -right-4 -top-4 rotate-[8deg] rounded-sm border-2 border-flame bg-white px-2.5 py-1 font-display text-sm font-extrabold text-flame">
+        Filed
+      </span>
+    </figure>
+  );
+}
+
+/** Headline set on ledger rules: each line sits on its own hairline. */
+function LedgerHeadline() {
+  return (
+    <h2 className="font-display text-5xl font-extrabold leading-none tracking-tight text-white 2xl:text-6xl">
+      {['Learn.', 'Practice.', 'Master taxation.'].map((line) => (
+        <span key={line} className="block border-b border-white/15 pb-3 pt-4">
+          {line}
+        </span>
+      ))}
+    </h2>
+  );
+}
+
+/** Sign-in and password screens: ledger brand panel (desktop) or compact header (phones) beside the form. */
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="grid min-h-screen w-full lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-      <aside className="relative hidden overflow-hidden bg-gradient-to-br from-[#0b3b47] via-brand-strong to-brand px-12 py-12 text-white lg:flex lg:flex-col lg:justify-between">
-        <div className="pointer-events-none absolute -right-32 -top-32 h-96 w-96 rounded-full bg-white/10 blur-2xl" aria-hidden="true" />
-        <div className="pointer-events-none absolute -bottom-40 -left-24 h-[28rem] w-[28rem] rounded-full border-[40px] border-white/5" aria-hidden="true" />
+    <div className="grid min-h-screen w-full bg-canvas lg:grid-cols-[minmax(0,5fr)_minmax(0,6fr)] lg:bg-white">
+      <aside className="relative hidden flex-col justify-between overflow-hidden bg-sidebar px-12 py-12 text-white lg:flex xl:px-16">
+        {/* Faint ledger ruling across the whole panel */}
+        <div
+          className="pointer-events-none absolute inset-0 bg-[repeating-linear-gradient(to_bottom,transparent_0,transparent_39px,rgba(255,255,255,0.04)_39px,rgba(255,255,255,0.04)_40px)]"
+          aria-hidden="true"
+        />
+        <div className="pointer-events-none absolute inset-y-0 left-8 w-px bg-flame/25 xl:left-12" aria-hidden="true" />
 
         <div className="relative">
           <Brand />
         </div>
 
-        <div className="relative max-w-md">
-          <p className="text-sm font-medium uppercase tracking-widest text-brand-soft">Professional Accounting Learning Platform</p>
-          <h2 className="mt-3 text-4xl font-extrabold leading-tight">
-            Learn. Practice.
-            <br />
-            Master Taxation.
-          </h2>
-          <ul className="mt-10 space-y-6">
-            {HIGHLIGHTS.map(({ icon: Icon, title, text }) => (
-              <li key={title} className="flex gap-4">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/10 text-white ring-1 ring-white/15">
-                  <Icon className="h-5 w-5" aria-hidden="true" />
-                </span>
-                <span>
-                  <span className="block font-semibold">{title}</span>
-                  <span className="block text-sm text-white/70">{text}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
+        <div className="relative max-w-xl">
+          <LedgerHeadline />
+          <p className="mt-6 max-w-sm text-base leading-relaxed text-white/75">
+            Video courses, daily attendance and hands-on GST, income tax and MCA filing practice, all in one place.
+          </p>
         </div>
 
-        <p className="relative text-xs text-white/60">© TAXBROS · Acharya Institute</p>
+        <div className="relative pr-4">
+          <FilingSlip />
+        </div>
       </aside>
 
-      <main className="flex min-h-screen flex-col bg-canvas lg:items-center lg:justify-center lg:px-8 lg:py-10">
-        {/* Phones and tablets: splash header from the mobile design */}
-        <div className="relative overflow-hidden rounded-b-[2rem] bg-gradient-to-br from-[#0b3b47] via-brand-strong to-brand px-6 pb-20 pt-12 text-white lg:hidden">
-          <div className="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/10" aria-hidden="true" />
-          <div className="relative">
-            <Brand large />
-            <p className="mt-6 text-center text-lg leading-snug text-white/90">
-              Learn. Practice.
-              <br />
-              Master Taxation.
-            </p>
-          </div>
+      <main className="flex min-h-screen flex-col lg:justify-center lg:px-12 xl:px-20">
+        {/* Phones and tablets: compact brand header */}
+        <div className="bg-sidebar px-6 pb-20 pt-10 text-white lg:hidden">
+          <Brand compact />
+          <p className="mt-8 font-display text-3xl font-extrabold leading-tight tracking-tight">
+            Learn. Practice.
+            <br />
+            Master taxation.
+          </p>
         </div>
-        <div className="relative z-10 -mt-12 flex flex-1 justify-center px-4 pb-10 lg:mt-0 lg:flex-none lg:px-0 lg:pb-0">{children}</div>
+        <div className="relative z-10 -mt-12 flex flex-1 justify-center px-4 pb-10 lg:mt-0 lg:flex-none lg:justify-start lg:px-0 lg:pb-0">
+          {children}
+        </div>
       </main>
     </div>
   );

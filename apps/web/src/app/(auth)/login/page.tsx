@@ -84,13 +84,13 @@ function LoginForm() {
   };
 
   return (
-    <Card className="h-fit w-full max-w-sm rounded-2xl shadow-lg sm:p-2 lg:shadow-sm">
-      <CardHeader className="items-center text-center">
-        <CardTitle className="text-2xl">Sign in</CardTitle>
-        <CardDescription>TAXBROS Learning Management System</CardDescription>
+    <Card className="h-fit w-full max-w-sm rounded-2xl shadow-lg sm:p-2 lg:max-w-md lg:rounded-none lg:border-0 lg:p-0 lg:shadow-none">
+      <CardHeader className="lg:px-0 lg:pb-8">
+        <CardTitle className="font-display text-2xl font-extrabold lg:text-4xl">Sign in</CardTitle>
+        <CardDescription className="text-base">Use the email and password your institute gave you.</CardDescription>
       </CardHeader>
-      <CardContent>
-        <form onSubmit={onSubmit} noValidate className="space-y-4">
+      <CardContent className="lg:px-0">
+        <form onSubmit={onSubmit} noValidate className="space-y-5">
           {error && (
             <div role="alert" className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
               {error}
@@ -125,7 +125,7 @@ function LoginForm() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={submitting}>
+          <Button type="submit" className="h-11 w-full text-base" disabled={submitting}>
             {submitting ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…
@@ -137,8 +137,8 @@ function LoginForm() {
             )}
           </Button>
 
-          <p className="text-center text-xs text-gray-500">
-            Forgotten your password? Ask the institute administrator to reset it.
+          <p className="text-center text-sm text-muted-foreground lg:text-left">
+            Forgot your password? Ask the institute administrator to reset it.
           </p>
         </form>
       </CardContent>

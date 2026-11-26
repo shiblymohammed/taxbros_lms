@@ -13,6 +13,12 @@ const nextConfig: NextConfig = {
   // Trace dependencies from the pnpm workspace root so the bundle includes hoisted packages
   outputFileTracingRoot: path.join(__dirname, '../..'),
   poweredByHeader: false,
+  // Dev only: hosts other than localhost that may load the dev server, e.g. a phone on the
+  // same Wi-Fi (DEV_ALLOWED_ORIGINS=192.168.1.48 in .env.local)
+  allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean),
   // Uploaded files (course covers) are stored as `/uploads/...` paths and served
   // by the API. Proxy them so they load from the web origin and work with next/image.
   async rewrites() {
@@ -33,6 +39,15 @@ const nextConfig: NextConfig = {
   },
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Signed-in pages are Client Components behind AppShell, which shows a spinner until the
+    // session is confirmed in the browser, so they can never prerender an instant UI. The default
+    // ('warning') validates every page and logs "Could not validate ... instant navigation" on each
+    // one. Validate only segments that opt in with `export const instant = true`.
+    instantInsights: {
+      validationLevel: 'manual-warning',
+    },
+  },
   turbopack: {
     rules: {
       '*.css': {

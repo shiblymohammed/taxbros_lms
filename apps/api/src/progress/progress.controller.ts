@@ -72,6 +72,8 @@ export class ProgressController {
     if (!studentId) {
       throw new BadRequestException('Student ID not found in user context');
     }
+    // Locked lessons (learning order / quiz gate) cannot record progress
+    await this.progressService.access.assertLessonOpen(studentId, lessonId);
     return this.progressService.updatePosition(lessonId, studentId, updatePositionDto);
   }
 
@@ -151,13 +153,10 @@ export class ProgressController {
     description: 'Lesson or student not found',
   })
   async getLessonProgress(@Param('lessonId') lessonId: string, @Req() req: any) {
-    // Get the student ID for the requesting user
-    const user = await this.progressService['prisma'].user.findUnique({
-      where: { id: req.user.userId },
-      include: { studentProfile: true },
-    });
+    // The signed-in user's student profile id, loaded once per request by JwtStrategy
+    const studentId: string | undefined = req.user.studentId;
 
-    if (!user || !user.studentProfile) {
+    if (!studentId) {
       // If the user doesn't have a student profile, they can't have progress
       return {
         id: null,
@@ -175,7 +174,7 @@ export class ProgressController {
 
     return this.progressService.getLessonProgress(
       lessonId,
-      user.studentProfile.id,
+      studentId,
       req.user.userId,
       req.user.role
     );
@@ -203,6 +202,9 @@ export class ProgressController {
     if (!studentId) {
       throw new BadRequestException('Student ID not found in user context');
     }
+    // Only an open lesson whose video has been watched can be completed by hand
+    await this.progressService.access.assertLessonOpen(studentId, lessonId);
+    await this.progressService.assertWatchedEnough(studentId, lessonId);
     return this.progressService.completeLesson(studentId, lessonId);
   }
 
@@ -281,13 +283,10 @@ export class ProgressController {
     description: 'Course or student not found',
   })
   async getCourseProgress(@Param('courseId') courseId: string, @Req() req: any) {
-    // Get the student ID for the requesting user
-    const user = await this.progressService['prisma'].user.findUnique({
-      where: { id: req.user.userId },
-      include: { studentProfile: true },
-    });
+    // The signed-in user's student profile id, loaded once per request by JwtStrategy
+    const studentId: string | undefined = req.user.studentId;
 
-    if (!user || !user.studentProfile) {
+    if (!studentId) {
       return {
         courseId: courseId,
         courseTitle: null,
@@ -299,7 +298,7 @@ export class ProgressController {
 
     return this.progressService.getCourseProgress(
       courseId,
-      user.studentProfile.id,
+      studentId,
       req.user.userId,
       req.user.role
     );

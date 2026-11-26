@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { apiClient } from '@/lib/api';
+import { getStoredUser } from '@/lib/auth';
 
 export interface StudentCourse {
   enrollmentId: string;
@@ -22,6 +23,23 @@ export interface StudentProgress {
   courses: StudentCourse[];
 }
 
+const STUDENT_ID_KEY = 'studentId';
+
+/**
+ * The signed-in user's student profile id. Looked up once with GET /auth/me, then kept for the
+ * browser session (keyed by user, so another sign-in looks it up again). Null when the user has no
+ * student profile.
+ */
+export async function getMyStudentId(): Promise<string | null> {
+  const userId = getStoredUser()?.id;
+  const cached = typeof window !== 'undefined' ? sessionStorage.getItem(STUDENT_ID_KEY) : null;
+  if (userId && cached?.startsWith(`${userId}:`)) return cached.slice(userId.length + 1);
+  const { data: me } = await apiClient.get<{ id?: string; studentId: string | null }>('/auth/me');
+  const owner = me.id ?? userId;
+  if (me.studentId && owner && typeof window !== 'undefined') sessionStorage.setItem(STUDENT_ID_KEY, `${owner}:${me.studentId}`);
+  return me.studentId;
+}
+
 /** The signed-in student's enrolments and progress (GET /students/:id/progress). */
 export function useStudentProgress() {
   const [progress, setProgress] = useState<StudentProgress | null>(null);
@@ -32,12 +50,12 @@ export function useStudentProgress() {
     setLoading(true);
     setError(null);
     try {
-      const { data: me } = await apiClient.get<{ studentId: string | null }>('/auth/me');
-      if (!me.studentId) {
+      const studentId = await getMyStudentId();
+      if (!studentId) {
         setError('No student profile found for this user');
         return;
       }
-      const { data } = await apiClient.get<StudentProgress>(`/students/${me.studentId}/progress`);
+      const { data } = await apiClient.get<StudentProgress>(`/students/${studentId}/progress`);
       setProgress(data);
     } catch (err) {
       const message = (err as { response?: { data?: { message?: string } } }).response?.data?.message;

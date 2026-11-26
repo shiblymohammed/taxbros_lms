@@ -232,19 +232,30 @@ enum AttendanceStatus {
   LATE
 }
 
+// How an attendance mark was made: by staff/admin, or by the person themselves
+enum AttendanceSource {
+  MARKED // Marked or corrected by a teacher or administrator
+  SELF_QR // Student scanned the class QR code / typed its code
+  SELF_CHECK_IN // Staff checked in on the institute network or at its location
+}
+
 enum RegisterStatus {
   DRAFT
   SAVED
 }
 
 model StudentAttendanceRegister {
-  id             String         @id @default(uuid())
-  classId        String
-  attendanceDate DateTime       @db.Date
-  rosterSnapshot Json // JSON array of student IDs
-  status         RegisterStatus @default(DRAFT)
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  id                  String         @id @default(uuid())
+  classId             String
+  attendanceDate      DateTime       @db.Date
+  rosterSnapshot      Json // JSON array of student IDs
+  status              RegisterStatus @default(DRAFT)
+  // Student self check-in (rotating QR code shown by the teacher)
+  selfCheckInSecret   String? // HMAC key for the rotating code; never sent to students
+  selfCheckInOpenedAt DateTime?
+  selfCheckInClosedAt DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
   // Relations
   class             Class               @relation(fields: [classId], references: [id], onDelete: Cascade)
@@ -264,6 +275,7 @@ model StudentAttendance {
   remarks    String?
   markedBy   String
   markedAt   DateTime         @default(now())
+  source     AttendanceSource @default(MARKED)
   createdAt  DateTime         @default(now())
   updatedAt  DateTime         @updatedAt
 
@@ -286,6 +298,11 @@ model StaffAttendance {
   remarks        String?
   markedBy       String
   markedAt       DateTime         @default(now())
+  source         AttendanceSource @default(MARKED)
+  // Self check-in: when, and how presence was confirmed ("network" or "location")
+  checkInAt      DateTime?
+  checkOutAt     DateTime?
+  checkInVia     String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
 

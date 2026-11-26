@@ -49,6 +49,8 @@ export function clearSession() {
   if (!isBrowser()) return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Cached student profile id (getMyStudentId)
+  sessionStorage.removeItem('studentId');
 }
 
 /** Where each role lands after signing in. */
@@ -58,7 +60,8 @@ export function homePathForRole(role: UserRole | string | undefined): string {
     case 'ADMINISTRATOR':
       return '/admin/dashboard';
     case 'STAFF':
-      return '/staff/attendance';
+      // Staff start the day by checking in
+      return '/staff/check-in';
     case 'STUDENT':
       return '/student/dashboard';
     default:

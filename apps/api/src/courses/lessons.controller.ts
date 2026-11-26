@@ -9,7 +9,9 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
+  ForbiddenException,
 } from '@nestjs/common';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { LessonsService } from './lessons.service';
 import { CreateLessonDto } from './dto/create-lesson.dto';
 import { UpdateLessonDto } from './dto/update-lesson.dto';
@@ -83,7 +85,16 @@ export class LessonsController {
    */
   @Get('lessons/:id')
   @Roles(UserRole.ADMINISTRATOR, UserRole.SUPER_ADMIN, UserRole.STAFF, UserRole.STUDENT)
-  findOne(@Param('id') id: string) {
+  async findOne(
+    @Param('id') id: string,
+    @CurrentUser('role') role: UserRole,
+    @CurrentUser('studentId') studentId: string | undefined,
+  ) {
+    // Students open only published lessons of their courses, in learning order (quiz gate)
+    if (role === UserRole.STUDENT) {
+      if (!studentId) throw new ForbiddenException('This account has no student profile');
+      await this.lessonsService.access.assertLessonOpen(studentId, id);
+    }
     return this.lessonsService.findOne(id);
   }
 
