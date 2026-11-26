@@ -297,7 +297,28 @@ export const studentProfileApi = {
 
 // ---------- Institute settings (R6) ----------
 
-export type SettingKey = 'timezone' | 'instituteName';
+export type SettingKey =
+  | 'timezone'
+  | 'instituteName'
+  // Self attendance
+  | 'attendanceNetworks'
+  | 'attendanceLocation'
+  | 'attendanceRadiusMeters'
+  | 'staffCheckInWindow'
+  | 'staffLateAfter'
+  | 'studentLateAfterMinutes'
+  | 'studentNetworkCheck';
+
+/** Settings shown under "Self attendance" on the settings page */
+export const ATTENDANCE_SETTING_KEYS: SettingKey[] = [
+  'attendanceNetworks',
+  'attendanceLocation',
+  'attendanceRadiusMeters',
+  'staffCheckInWindow',
+  'staffLateAfter',
+  'studentLateAfterMinutes',
+  'studentNetworkCheck',
+];
 
 export interface InstituteSetting {
   key: SettingKey;

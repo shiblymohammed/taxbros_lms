@@ -4,8 +4,10 @@ import { staffNav } from '@/lib/staff-access';
 import { bottomTabs } from './bottom-nav';
 
 describe('bottomTabs (phone tab bar)', () => {
-  it('shows the whole student menu', () => {
-    expect(bottomTabs(STUDENT_NAV)).toEqual({ tabs: STUDENT_NAV, more: false });
+  it('shows the four flagged student screens and a More button', () => {
+    const { tabs, more } = bottomTabs(STUDENT_NAV);
+    expect(tabs.map((t) => t.tabLabel ?? t.label)).toEqual(['Home', 'Courses', 'Check in', 'Tests']);
+    expect(more).toBe(true);
   });
 
   it('shows the four flagged admin screens and a More button', () => {

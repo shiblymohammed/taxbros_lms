@@ -32,7 +32,7 @@ function fakeJwt(payload: Record<string, unknown>) {
 describe('role routing', () => {
   it('sends each role to its home', () => {
     expect(homePathForRole('STUDENT')).toBe('/student/dashboard');
-    expect(homePathForRole('STAFF')).toBe('/staff/attendance');
+    expect(homePathForRole('STAFF')).toBe('/staff/check-in');
     expect(homePathForRole('ADMINISTRATOR')).toBe('/admin/dashboard');
     expect(homePathForRole('SUPER_ADMIN')).toBe('/admin/dashboard');
     expect(homePathForRole(undefined)).toBe('/login');

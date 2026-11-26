@@ -14,7 +14,7 @@ describe('Sidebar (R34)', () => {
   it('keeps a group together even when its items are not next to each other', () => {
     const groups = groupNav(staffNav(['VIEW_REPORTS', 'MANAGE_CLASSES']));
     expect(groups.map((g) => [g.group, g.items.map((i) => i.label)])).toEqual([
-      ['Attendance', ['Class Register', 'Reports']],
+      ['Attendance', ['My Attendance', 'Class Register', 'Reports']],
       ['People', ['Classes']],
     ]);
   });

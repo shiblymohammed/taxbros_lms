@@ -53,6 +53,15 @@ export class SettingsService {
     return row?.value ?? SETTING_DEFINITIONS[key].defaultValue;
   }
 
+  /** Every setting's current value (defaults filled in), in one query. */
+  async values(): Promise<Record<SettingKey, string>> {
+    const rows = await this.prisma.instituteSetting.findMany();
+    const byKey = new Map(rows.map((r) => [r.key, r.value]));
+    return Object.fromEntries(
+      (Object.keys(SETTING_DEFINITIONS) as SettingKey[]).map((key) => [key, byKey.get(key) ?? SETTING_DEFINITIONS[key].defaultValue]),
+    ) as Record<SettingKey, string>;
+  }
+
   /** Validates against the setting's rules and records who changed it (R6.2, R6.3). */
   async update(key: string, rawValue: string, userId: string): Promise<SettingView> {
     if (!isSettingKey(key)) {

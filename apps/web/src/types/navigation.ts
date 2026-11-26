@@ -10,6 +10,7 @@ export type NavIcon =
   | 'quizzes'
   | 'labs'
   | 'register'
+  | 'check-in'
   | 'staff-attendance'
   | 'reports'
   | 'settings'

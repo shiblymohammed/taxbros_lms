@@ -60,7 +60,8 @@ export function homePathForRole(role: UserRole | string | undefined): string {
     case 'ADMINISTRATOR':
       return '/admin/dashboard';
     case 'STAFF':
-      return '/staff/attendance';
+      // Staff start the day by checking in
+      return '/staff/check-in';
     case 'STUDENT':
       return '/student/dashboard';
     default:

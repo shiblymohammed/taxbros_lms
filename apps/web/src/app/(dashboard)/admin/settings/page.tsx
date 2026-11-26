@@ -7,7 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { settingsApi, timezoneOptions, type InstituteSetting, type SettingKey } from '@/lib/admin-api';
+import {
+  ATTENDANCE_SETTING_KEYS,
+  settingsApi,
+  timezoneOptions,
+  type InstituteSetting,
+  type SettingKey,
+} from '@/lib/admin-api';
+import { selfAttendanceApi } from '@/lib/self-attendance';
 import { formatDateTime, resetInstituteTimezone } from '@/lib/institute-time';
 import { getApiErrorMessage } from '@/lib/lab-validation';
 
@@ -28,6 +35,15 @@ export default function SettingsPage() {
         setDraft(Object.fromEntries(all.map((s) => [s.key, s.value])));
       })
       .catch((err) => setLoadError(getApiErrorMessage(err)));
+  }, []);
+
+  // This device's address as the server sees it, to add the institute network in one tap
+  const [myAddress, setMyAddress] = useState<string | null>(null);
+  useEffect(() => {
+    selfAttendanceApi
+      .network()
+      .then((r) => setMyAddress(r.ip || null))
+      .catch(() => setMyAddress(null));
   }, []);
 
   const timezone = settings?.find((s) => s.key === 'timezone')?.value ?? 'Asia/Kolkata';
@@ -76,64 +92,129 @@ export default function SettingsPage() {
   return (
     <div className="container mx-auto max-w-3xl px-4 py-6 sm:py-8">
       <h1 className="mb-1 text-xl font-bold sm:text-2xl">Institute settings</h1>
-      <p className="mb-6 text-sm text-gray-600">Only administrators can change these. Times are stored in UTC and shown in the institute timezone.</p>
+      <p className="mb-6 text-sm text-gray-600">
+        Only administrators can change these. Times are stored in UTC and shown in the institute
+        timezone.
+      </p>
 
       <div className="space-y-6">
         {settings.map((s) => {
+          const firstAttendance = s.key === ATTENDANCE_SETTING_KEYS[0];
           const changed = (draft[s.key] ?? '') !== s.value;
           const inputId = `setting-${s.key}`;
           return (
-            <Card key={s.key}>
-              <CardHeader>
-                <CardTitle className="text-lg">{s.label}</CardTitle>
-                <CardDescription>{s.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={(e) => save(e, s.key)} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-                  <div className="flex-1">
-                    <Label htmlFor={inputId} className="sr-only">
-                      {s.label}
-                    </Label>
-                    {s.key === 'timezone' ? (
-                      <select
-                        id={inputId}
-                        value={draft[s.key] ?? ''}
-                        onChange={(e) => setDraft((p) => ({ ...p, [s.key]: e.target.value }))}
-                        className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-                      >
-                        {zones.map((z) => (
-                          <option key={z} value={z}>
-                            {z.replace(/_/g, ' ')}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <Input
-                        id={inputId}
-                        value={draft[s.key] ?? ''}
-                        maxLength={100}
-                        onChange={(e) => setDraft((p) => ({ ...p, [s.key]: e.target.value }))}
-                        aria-invalid={!!errors[s.key]}
-                      />
-                    )}
-                  </div>
-                  <Button type="submit" disabled={!changed || saving === s.key} className="gap-2">
-                    {saving === s.key ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                    Save
-                  </Button>
-                </form>
-                {errors[s.key] && (
-                  <p role="alert" className="mt-2 text-sm text-red-700">
-                    {errors[s.key]}
+            <div key={s.key} className="space-y-3">
+              {firstAttendance && (
+                <div className="pt-4">
+                  <h2 className="text-lg font-bold">Self attendance</h2>
+                  <p className="text-sm text-gray-600">
+                    Staff check in and out themselves, and students check in to a class with the
+                    code their teacher shows. Set the institute Wi-Fi address, its location, or
+                    both: a check-in counts when either matches.
                   </p>
-                )}
-                <p className="mt-3 text-xs text-gray-500">
-                  {s.updatedAt
-                    ? `Last changed by ${s.updatedByName ?? 'an administrator'} on ${formatDateTime(s.updatedAt, timezone)}`
-                    : 'Using the default value'}
-                </p>
-              </CardContent>
-            </Card>
+                </div>
+              )}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">{s.label}</CardTitle>
+                  <CardDescription>{s.description}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    onSubmit={(e) => save(e, s.key)}
+                    className="flex flex-col gap-3 sm:flex-row sm:items-end"
+                  >
+                    <div className="flex-1">
+                      <Label htmlFor={inputId} className="sr-only">
+                        {s.label}
+                      </Label>
+                      {s.key === 'timezone' ? (
+                        <select
+                          id={inputId}
+                          value={draft[s.key] ?? ''}
+                          onChange={(e) => setDraft((p) => ({ ...p, [s.key]: e.target.value }))}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          {zones.map((z) => (
+                            <option key={z} value={z}>
+                              {z.replace(/_/g, ' ')}
+                            </option>
+                          ))}
+                        </select>
+                      ) : s.key === 'studentNetworkCheck' ? (
+                        <select
+                          id={inputId}
+                          value={draft[s.key] ?? 'off'}
+                          onChange={(e) => setDraft((p) => ({ ...p, [s.key]: e.target.value }))}
+                          className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                        >
+                          <option value="off">Off: the class code is enough</option>
+                          <option value="on">
+                            On: also on the institute Wi-Fi or at its location
+                          </option>
+                        </select>
+                      ) : (
+                        <Input
+                          id={inputId}
+                          value={draft[s.key] ?? ''}
+                          maxLength={100}
+                          onChange={(e) => setDraft((p) => ({ ...p, [s.key]: e.target.value }))}
+                          aria-invalid={!!errors[s.key]}
+                        />
+                      )}
+                    </div>
+                    <Button type="submit" disabled={!changed || saving === s.key} className="gap-2">
+                      {saving === s.key ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save
+                    </Button>
+                  </form>
+                  {s.key === 'attendanceNetworks' && myAddress && (
+                    <p className="mt-2 text-xs text-gray-600">
+                      This device&apos;s address is <span className="font-mono">{myAddress}</span>.{' '}
+                      {!(draft[s.key] ?? '')
+                        .split(',')
+                        .map((p) => p.trim())
+                        // Already listed, exactly or inside a range like "192.168.1."
+                        .some((p) => !!p && (p.endsWith('.') || p.endsWith(':') ? myAddress.startsWith(p) : p === myAddress)) && (
+                        <button
+                          type="button"
+                          className="font-semibold text-brand-strong underline"
+                          onClick={() =>
+                            setDraft((p) => ({
+                              ...p,
+                              [s.key]: [
+                                ...(p[s.key] ?? '')
+                                  .split(',')
+                                  .map((x) => x.trim())
+                                  .filter(Boolean),
+                                myAddress,
+                              ].join(', '),
+                            }))
+                          }
+                        >
+                          Add it
+                        </button>
+                      )}{' '}
+                      (only if you are on the institute Wi-Fi now; then Save).
+                    </p>
+                  )}
+                  {errors[s.key] && (
+                    <p role="alert" className="mt-2 text-sm text-red-700">
+                      {errors[s.key]}
+                    </p>
+                  )}
+                  <p className="mt-3 text-xs text-gray-500">
+                    {s.updatedAt
+                      ? `Last changed by ${s.updatedByName ?? 'an administrator'} on ${formatDateTime(s.updatedAt, timezone)}`
+                      : 'Using the default value'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
           );
         })}
       </div>

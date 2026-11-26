@@ -3,6 +3,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import {
+  QrCode,
   BarChart3,
   BookOpen,
   CalendarCheck,
@@ -33,6 +34,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   quizzes: ListChecks,
   labs: FlaskConical,
   register: CalendarCheck,
+  'check-in': QrCode,
   'staff-attendance': UserCheck,
   reports: BarChart3,
   settings: Settings,

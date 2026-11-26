@@ -47,10 +47,11 @@ export function staffCanOpen(path: string, permissions: string[] | undefined): b
   return !!area && area.anyOf.some((p) => (permissions ?? []).includes(p));
 }
 
-/** Staff menu: the class register, then every admin area their permissions open. */
+/** Staff menu: their own check-in, the class register, then every admin area their permissions open. */
 export function staffNav(permissions: string[] | undefined): NavItem[] {
   const held = permissions ?? [];
   return [
+    { href: '/staff/check-in', label: 'My Attendance', icon: 'check-in', group: 'Attendance' },
     { href: '/staff/attendance', label: 'Class Register', icon: 'register', group: 'Attendance' },
     ...STAFF_AREAS.filter((a) => a.nav && a.anyOf.some((p) => held.includes(p))).map((a) => a.nav!),
   ];

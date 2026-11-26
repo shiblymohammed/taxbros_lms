@@ -8,7 +8,7 @@ import { MarkStaffAttendanceDto } from './dto/mark-staff-attendance.dto';
 import { MarkStudentAttendanceDto } from './dto/mark-student-attendance.dto';
 import { OpenRegisterDto } from './dto/open-register.dto';
 import { GetStaffAttendanceQueryDto } from './dto/get-staff-attendance-query.dto';
-import { RegisterStatus } from '@prisma/client';
+import { AttendanceSource, RegisterStatus } from '@prisma/client';
 
 /**
  * Attendance Service
@@ -207,6 +207,8 @@ export class AttendanceService {
           remarks: mark.remarks,
           markedBy: markedByUserId,
           markedAt: new Date(),
+          // A teacher's correction replaces a student's own check-in
+          source: AttendanceSource.MARKED,
         },
       }),
     );
@@ -286,6 +288,8 @@ export class AttendanceService {
         remarks: dto.remarks,
         markedBy: markedByUserId,
         markedAt: new Date(),
+        // An administrator's correction; check-in/out times (if any) are kept
+        source: AttendanceSource.MARKED,
       },
       include: {
         staff: {
