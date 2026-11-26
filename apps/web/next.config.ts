@@ -13,6 +13,12 @@ const nextConfig: NextConfig = {
   // Trace dependencies from the pnpm workspace root so the bundle includes hoisted packages
   outputFileTracingRoot: path.join(__dirname, '../..'),
   poweredByHeader: false,
+  // Dev only: hosts other than localhost that may load the dev server, e.g. a phone on the
+  // same Wi-Fi (DEV_ALLOWED_ORIGINS=192.168.1.48 in .env.local)
+  allowedDevOrigins: (process.env.DEV_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((host) => host.trim())
+    .filter(Boolean),
   // Uploaded files (course covers) are stored as `/uploads/...` paths and served
   // by the API. Proxy them so they load from the web origin and work with next/image.
   async rewrites() {

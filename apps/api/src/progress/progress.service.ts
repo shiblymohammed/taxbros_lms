@@ -689,13 +689,7 @@ export class ProgressService {
     // Verify the student exists
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
-      include: {
-        user: {
-          select: {
-            id: true,
-          },
-        },
-      },
+      select: { userId: true, firstName: true, lastName: true },
     });
 
     if (!student) {
@@ -705,44 +699,44 @@ export class ProgressService {
     // Authorization: students can only view their own progress
     if (
       requestingUserRole === UserRole.STUDENT &&
-      student.user.id !== requestingUserId
+      student.userId !== requestingUserId
     ) {
       throw new ForbiddenException(
         'You can only view your own progress',
       );
     }
 
-    // Get all course enrollments for this student
-    const enrollments = await this.prisma.courseEnrollment.findMany({
-      where: {
-        studentId: studentId,
-      },
-      include: {
-        course: {
-          include: {
-            modules: {
-              orderBy: { displayOrder: 'asc' },
-              include: {
-                lessons: {
-                  where: { status: 'PUBLISHED' },
-                  orderBy: { displayOrder: 'asc' },
+    // Course enrollments (with published lessons) and all lesson progress, loaded together
+    const [enrollments, allProgress] = await Promise.all([
+      this.prisma.courseEnrollment.findMany({
+        where: {
+          studentId: studentId,
+        },
+        include: {
+          course: {
+            include: {
+              modules: {
+                orderBy: { displayOrder: 'asc' },
+                include: {
+                  lessons: {
+                    where: { status: 'PUBLISHED' },
+                    orderBy: { displayOrder: 'asc' },
+                  },
                 },
               },
             },
           },
         },
-      },
-      orderBy: {
-        enrolledAt: 'desc',
-      },
-    });
-
-    // Get all lesson progress for this student
-    const allProgress = await this.prisma.lessonProgress.findMany({
-      where: {
-        studentId: studentId,
-      },
-    });
+        orderBy: {
+          enrolledAt: 'desc',
+        },
+      }),
+      this.prisma.lessonProgress.findMany({
+        where: {
+          studentId: studentId,
+        },
+      }),
+    ]);
 
     const progressMap = new Map(
       allProgress.map((p) => [p.lessonId, p]),

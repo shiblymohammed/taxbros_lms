@@ -49,6 +49,8 @@ export function clearSession() {
   if (!isBrowser()) return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(USER_KEY);
+  // Cached student profile id (getMyStudentId)
+  sessionStorage.removeItem('studentId');
 }
 
 /** Where each role lands after signing in. */

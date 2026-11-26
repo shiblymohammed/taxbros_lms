@@ -196,6 +196,11 @@ export class QuizzesService {
       where.lessonId = filters.lessonId;
     }
 
+    // A student's active enrolments, read at the same time as the quizzes (used below)
+    const enrolmentsLoad = isStudent
+      ? this.prisma.courseEnrollment.findMany({ where: { studentId, status: 'ACTIVE' }, select: { courseId: true } })
+      : Promise.resolve([] as Array<{ courseId: string }>);
+
     const quizzes = await this.prisma.quiz.findMany({
       where,
       include: {
@@ -214,10 +219,7 @@ export class QuizzesService {
     }
 
     // Students only get quizzes from courses they are actively enrolled in (R2.11)
-    const enrolments = await this.prisma.courseEnrollment.findMany({
-      where: { studentId, status: 'ACTIVE' },
-      select: { courseId: true },
-    });
+    const enrolments = await enrolmentsLoad;
     const enrolled = new Set(enrolments.map((e) => e.courseId));
 
     const mine = withCourse.filter((quiz) => quiz.owningCourseId && enrolled.has(quiz.owningCourseId));

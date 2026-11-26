@@ -72,7 +72,9 @@ describe('ClassRegisterPage (Task 22, T2)', () => {
 
     render(<ClassRegisterPage />);
 
-    await screen.findByText('Aarav Pillai');
+    // First render in this file: allow more than the default 1 s when the machine is busy
+    // (the pre-commit hook runs the API and web suites at the same time)
+    await screen.findByText('Aarav Pillai', {}, { timeout: 5000 });
     expect(registersApi.open).toHaveBeenCalledWith('class-1', expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/));
     expect(screen.getByText(/2 unmarked/)).toBeInTheDocument();
 

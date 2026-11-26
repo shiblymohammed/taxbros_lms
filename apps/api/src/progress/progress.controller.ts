@@ -153,13 +153,10 @@ export class ProgressController {
     description: 'Lesson or student not found',
   })
   async getLessonProgress(@Param('lessonId') lessonId: string, @Req() req: any) {
-    // Get the student ID for the requesting user
-    const user = await this.progressService['prisma'].user.findUnique({
-      where: { id: req.user.userId },
-      include: { studentProfile: true },
-    });
+    // The signed-in user's student profile id, loaded once per request by JwtStrategy
+    const studentId: string | undefined = req.user.studentId;
 
-    if (!user || !user.studentProfile) {
+    if (!studentId) {
       // If the user doesn't have a student profile, they can't have progress
       return {
         id: null,
@@ -177,7 +174,7 @@ export class ProgressController {
 
     return this.progressService.getLessonProgress(
       lessonId,
-      user.studentProfile.id,
+      studentId,
       req.user.userId,
       req.user.role
     );
@@ -286,13 +283,10 @@ export class ProgressController {
     description: 'Course or student not found',
   })
   async getCourseProgress(@Param('courseId') courseId: string, @Req() req: any) {
-    // Get the student ID for the requesting user
-    const user = await this.progressService['prisma'].user.findUnique({
-      where: { id: req.user.userId },
-      include: { studentProfile: true },
-    });
+    // The signed-in user's student profile id, loaded once per request by JwtStrategy
+    const studentId: string | undefined = req.user.studentId;
 
-    if (!user || !user.studentProfile) {
+    if (!studentId) {
       return {
         courseId: courseId,
         courseTitle: null,
@@ -304,7 +298,7 @@ export class ProgressController {
 
     return this.progressService.getCourseProgress(
       courseId,
-      user.studentProfile.id,
+      studentId,
       req.user.userId,
       req.user.role
     );

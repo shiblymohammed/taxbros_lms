@@ -241,7 +241,9 @@ describe('ProgressService', () => {
 
       expect(result.autoCompleted).toBe(false);
       const saved = mockPrismaService.lessonProgress.upsert.mock.calls.at(-1)[0].update;
-      expect(saved.lastPosition).toBeLessThanOrEqual(100 + 10 * 2 + 15);
+      // 10 s at up to 2x plus 15 s slack; real time keeps running between building the mock and
+      // the call, so allow a fraction of a second on top
+      expect(saved.lastPosition).toBeLessThan(100 + 10 * 2 + 15 + 1);
       expect(saved.status).toBe(LessonProgressStatus.IN_PROGRESS);
     });
 

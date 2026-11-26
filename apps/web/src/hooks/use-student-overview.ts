@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiClient, quizzesApi, type Quiz, type QuizAttemptSummary } from '@/lib/api';
-import type { StudentCourse, StudentProgress } from './use-student-progress';
+import { getMyStudentId, type StudentCourse, type StudentProgress } from './use-student-progress';
 
 /** What a student must finish before a locked lesson or quiz opens (learning order / quiz gate). */
 export interface Blocker {
@@ -90,12 +90,19 @@ export function useStudentOverview(): StudentOverview {
     let cancelled = false;
     (async () => {
       try {
-        const { data: me } = await apiClient.get<{ studentId: string | null }>('/auth/me');
-        if (!me.studentId) throw new Error('No student profile found for this user');
-        const { data: progress } = await apiClient.get<StudentProgress>(`/students/${me.studentId}/progress`);
+        // Requests that don't depend on each other start together: the published quizzes don't
+        // need the student id, and course progress doesn't need the quiz list.
+        const allQuizzesLoad = quizzesApi.getAvailableQuizzes().catch((err) => {
+          console.error('Failed to load quizzes:', err);
+          return [];
+        });
+        const studentId = await getMyStudentId();
+        if (!studentId) throw new Error('No student profile found for this user');
+        const { data: progress } = await apiClient.get<StudentProgress>(`/students/${studentId}/progress`);
         const courses = progress.courses.filter((c) => c.enrollmentStatus !== 'DROPPED');
+        const titles = new Map(courses.map((c) => [c.courseId, c.courseTitle]));
 
-        const courseEntries = await Promise.all(
+        const courseEntriesLoad = Promise.all(
           courses.map(async (c): Promise<[string, CourseLesson[], CourseQuiz[]]> => {
             try {
               const { data } = await apiClient.get<{ lessons?: CourseLesson[]; quizzes?: CourseQuiz[] }>(`/courses/${c.courseId}/progress`);
@@ -106,32 +113,30 @@ export function useStudentOverview(): StudentOverview {
           }),
         );
 
-        let quizzes: StudentQuiz[] = [];
-        try {
-          const all = await quizzesApi.getAvailableQuizzes(me.studentId);
-          const titles = new Map(courses.map((c) => [c.courseId, c.courseTitle]));
-          const mine = all.filter((q) => {
-            const id = courseOf(q);
-            return !!id && titles.has(id);
-          });
-          quizzes = await Promise.all(
-            mine.map(async (quiz) => {
-              const attempts = await quizzesApi.getQuizAttempts(quiz.id).catch(() => [] as QuizAttemptSummary[]);
-              const best = attempts.reduce<QuizAttemptSummary | undefined>((b, a) => (!b || a.score > b.score ? a : b), undefined);
-              return {
-                ...quiz,
-                courseTitle: titles.get(courseOf(quiz)!) ?? '',
-                attempts,
-                attemptCount: attempts.length,
-                bestScore: best?.score,
-                bestPercent: best && quiz.totalMarks > 0 ? Math.round((best.score / quiz.totalMarks) * 100) : undefined,
-                passed: attempts.some((a) => a.passed),
-              };
-            }),
-          );
-        } catch (err) {
-          console.error('Failed to load quizzes:', err);
-        }
+        const quizzesLoad = allQuizzesLoad.then((all) =>
+          Promise.all(
+            all
+              .filter((q) => {
+                const id = courseOf(q);
+                return !!id && titles.has(id);
+              })
+              .map(async (quiz): Promise<StudentQuiz> => {
+                const attempts = await quizzesApi.getQuizAttempts(quiz.id).catch(() => [] as QuizAttemptSummary[]);
+                const best = attempts.reduce<QuizAttemptSummary | undefined>((b, a) => (!b || a.score > b.score ? a : b), undefined);
+                return {
+                  ...quiz,
+                  courseTitle: titles.get(courseOf(quiz)!) ?? '',
+                  attempts,
+                  attemptCount: attempts.length,
+                  bestScore: best?.score,
+                  bestPercent: best && quiz.totalMarks > 0 ? Math.round((best.score / quiz.totalMarks) * 100) : undefined,
+                  passed: attempts.some((a) => a.passed),
+                };
+              }),
+          ),
+        );
+
+        const [courseEntries, quizzes] = await Promise.all([courseEntriesLoad, quizzesLoad]);
 
         if (!cancelled) {
           setState({
